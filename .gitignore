@@ -4,3 +4,5 @@
 
 # Blender
 *.blend[0-9]
+*.glb
+*.gltf
