@@ -1,0 +1,22 @@
+[package]
+name = "bevy_jam_8"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[profile.dev]
+opt-level = 0
+
+[dependencies.bevy]
+version = "0.20.1"
+features = []
+
+# Enable high optimizations for dependencies (incl. Bevy), but not for our code:
+[profile.dev.package."*"]
+opt-level = 3
+
+
+[features]
+default = ["dynamic_linking"]
+dynamic_linking = ["bevy/dynamic_linking"]
