@@ -2,3 +2,5 @@
 /result*
 /.direnv
 
+# Blender
+*.blend[0-9]
