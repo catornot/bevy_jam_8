@@ -31,11 +31,18 @@ fn main() {
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let hedgehog = asset_server.load(GltfAssetLabel::Scene(0).from_asset("hedgehog.glb"));
-    commands.spawn((WorldAssetRoot(hedgehog), Hedgehog, Transform::from_translation(Vec3::new(0., 2., 0.))));
+    commands.spawn((
+        WorldAssetRoot(hedgehog),
+        Hedgehog,
+        Transform::from_translation(Vec3::new(0., 2., 0.)),
+        RigidBody::Dynamic,
+        Collider::cuboid(2., 2., 2.),
+    ));
 }
 
 fn update(mut query: Query<&mut Transform, With<Hedgehog>>, time: Res<Time>) {
     for mut transform in &mut query {
         transform.rotate_y(time.delta_secs() / 2.);
+        transform.rotate_x(time.delta_secs() * 20.);
     }
 }
