@@ -1,15 +1,26 @@
+#![allow(clippy::type_complexity)]
+
 use avian3d::prelude::*;
-use bevy::prelude::*;
+use bevy::{diagnostic::FrameTimeDiagnosticsPlugin, prelude::*};
 use bevy_ahoy::AhoyPlugins;
+use bevy_asset_loader::prelude::*;
 use bevy_enhanced_input::EnhancedInputPlugin;
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
+mod camera;
 mod default_scene;
+mod pickups;
 mod player;
+mod prelude;
 
-/// A marker component for our shapes so we can query them separately from the ground plane
-#[derive(Component)]
-struct Hedgehog;
+#[allow(unused)]
+#[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
+enum GlobalStates {
+    #[default]
+    AssetLoading,
+    MainMenu,
+    Game,
+}
 
 fn main() {
     App::new()
@@ -23,26 +34,16 @@ fn main() {
             WorldInspectorPlugin::new(),
             player::player_plugin,
             default_scene::default_scene_plugin,
+            pickups::pickups_plugin,
+            camera::camera_plugin,
+            FrameTimeDiagnosticsPlugin::default(),
         ))
-        .add_systems(Startup, setup)
-        .add_systems(Update, update)
+        .add_loading_state(
+            LoadingState::new(GlobalStates::AssetLoading)
+                .continue_to_state(GlobalStates::Game)
+                .load_collection::<player::PlayerAssets>()
+                .load_collection::<pickups::berries::BerryAssets>(),
+        )
+        .init_state::<GlobalStates>()
         .run();
-}
-
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let hedgehog = asset_server.load(GltfAssetLabel::Scene(0).from_asset("hedgehog.glb"));
-    commands.spawn((
-        WorldAssetRoot(hedgehog),
-        Hedgehog,
-        Transform::from_translation(Vec3::new(0., 2., 0.)),
-        RigidBody::Dynamic,
-        Collider::cuboid(2., 2., 2.),
-    ));
-}
-
-fn update(mut query: Query<&mut Transform, With<Hedgehog>>, time: Res<Time>) {
-    for mut transform in &mut query {
-        transform.rotate_y(time.delta_secs() / 2.);
-        transform.rotate_x(time.delta_secs() * 20.);
-    }
 }
