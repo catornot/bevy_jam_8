@@ -1,11 +1,22 @@
 use avian3d::prelude::*;
 use bevy::{
-    light::Skybox, prelude::*, render::render_resource::{TextureViewDescriptor, TextureViewDimension},
+    anti_alias::taa::TemporalAntiAliasing,
+    light::Skybox,
+    pbr::ScreenSpaceAmbientOcclusion,
+    prelude::*,
+    render::render_resource::{TextureViewDescriptor, TextureViewDimension},
 };
 
+use crate::prelude::*;
+
 pub fn default_scene_plugin(app: &mut App) {
-    app.add_systems(Startup, (scene, skybox_startup))
-        .add_systems(Update, skybox_update);
+    app.insert_resource(GlobalAmbientLight {
+        color: Color::srgb_u8(210, 220, 240),
+        brightness: 1.0,
+        ..default()
+    })
+    .add_systems(OnEnter(GlobalStates::Game), scene)
+    .add_observer(add_skybox_to_camera);
 }
 
 fn scene(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -45,35 +56,35 @@ fn other_scene() -> impl SceneList {
     }
 }
 
+fn add_skybox_to_camera(trigger: On<Add<Camera>>, mut commands: Commands, cubemap: Res<Cubemap>) {
+    if let Ok(mut camera_cmds) = commands.get_entity(trigger.entity) {
+        camera_cmds.insert((
+            Msaa::Off,
+            TemporalAntiAliasing::default(),
+            ScreenSpaceAmbientOcclusion::default(),
+            Skybox {
+                brightness: 1000.0,
+                image: Some(cubemap.image_handle.clone()),
+                ..Default::default()
+            },
+        ));
+    }
+}
 
 #[derive(Resource)]
-struct Cubemap {
+pub struct Cubemap {
     image_handle: Handle<Image>,
-    is_updated: bool,
 }
 
-fn skybox_startup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let image_handle: Handle<Image> = asset_server.load("skybox.png");
+impl AssetCollection for Cubemap {
+    fn create(world: &mut World) -> Self {
+        let asset_server = world.resource::<AssetServer>();
+        let image_handle = asset_server.load("skybox.png");
+        let mut images = world.resource_mut::<Assets<Image>>();
+        let mut image = images
+            .get_mut(&image_handle)
+            .expect("cubemap image should be loaded by now");
 
-    commands.spawn(Skybox {
-        brightness: 1000.0,
-        ..Default::default()
-    });
-
-    commands.insert_resource(Cubemap {
-        image_handle,
-        is_updated: false,
-    });
-}
-
-fn skybox_update(
-    asset_server: Res<AssetServer>,
-    mut images: ResMut<Assets<Image>>,
-    mut cubemap: ResMut<Cubemap>,
-    mut skyboxes: Query<&mut Skybox>,
-) {
-    if !cubemap.is_updated && asset_server.load_state(&cubemap.image_handle).is_loaded() {
-        let mut image = images.get_mut(&cubemap.image_handle).unwrap();
         if image.texture_descriptor.array_layer_count() == 1 {
             let layers = image.height() / image.width();
             image
@@ -85,11 +96,12 @@ fn skybox_update(
             });
         }
 
-        // there's only one skybox anyway
-        for mut skybox in &mut skyboxes {
-            skybox.image = Some(cubemap.image_handle.clone());
-        }
+        Self { image_handle }
+    }
 
-        cubemap.is_updated = true;
+    fn load(world: &mut World) -> Vec<UntypedHandle> {
+        let asset_server = world.resource::<AssetServer>();
+
+        vec![asset_server.load::<Image>("skybox.png").untyped()]
     }
 }

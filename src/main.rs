@@ -42,6 +42,7 @@ fn main() {
             LoadingState::new(GlobalStates::AssetLoading)
                 .continue_to_state(GlobalStates::Game)
                 .load_collection::<player::PlayerAssets>()
+                .load_collection::<default_scene::Cubemap>()
                 .load_collection::<pickups::berries::BerryAssets>(),
         )
         .init_state::<GlobalStates>()
