@@ -1,34 +1,50 @@
 use avian3d::prelude::*;
 use bevy::{
-    light::Skybox,
-    prelude::*,
-    render::render_resource::{TextureViewDescriptor, TextureViewDimension},
+    light::Skybox, prelude::*, render::render_resource::{TextureViewDescriptor, TextureViewDimension},
 };
 
 pub fn default_scene_plugin(app: &mut App) {
-    app.add_systems(Startup, (skybox_startup, ground, scene.spawn()))
+    app.add_systems(Startup, (scene, skybox_startup))
         .add_systems(Update, skybox_update);
 }
 
-fn ground(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    let size: f32 = 500.0;
-
-    commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(size, 1.0, size))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::WHITE,
-            base_color_texture: Some(asset_server.load("ground.png")),
-            ..default()
-        })),
-        Collider::cuboid(size, 1.0, size),
-        RigidBody::Static,
-    ));
+fn scene(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn_scene_list(other_scene());
+    commands.spawn_scene(ground_scene(100., &asset_server));
 }
+
+fn ground_scene(size: f32, asset_server: &AssetServer) -> impl Scene {
+    let standard_material = StandardMaterial {
+        base_color: Color::WHITE,
+        base_color_texture: Some(asset_server.load("ground.png")),
+        ..default()
+    };
+
+    bsn! {
+        Mesh3d(asset_value(Cuboid::new(size, 1.0, size)))
+        MeshMaterial3d::<StandardMaterial>(asset_value(standard_material))
+        Collider::cuboid(size, 1.0, size)
+        RigidBody::Static
+    }
+}
+
+fn other_scene() -> impl SceneList {
+    bsn_list! {
+        #Cube
+        Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
+        MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
+        Transform::from_xyz(0.0, 0.5, 0.0)
+        Collider::cuboid(1.0, 1.0,1.0)
+        RigidBody::Static
+        --
+        #PointLight
+        PointLight {
+            shadow_maps_enabled: true,
+        }
+        Transform::from_xyz(4.0, 8.0, 4.0)
+    }
+}
+
 
 #[derive(Resource)]
 struct Cubemap {
@@ -45,7 +61,7 @@ fn skybox_startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     });
 
     commands.insert_resource(Cubemap {
-        image_handle: image_handle,
+        image_handle,
         is_updated: false,
     });
 }
@@ -75,25 +91,5 @@ fn skybox_update(
         }
 
         cubemap.is_updated = true;
-    }
-}
-
-/// set up a simple 3D scene
-fn scene() -> impl SceneList {
-    bsn_list! {
-        #Cube
-        Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
-        MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
-        Transform::from_xyz(0.0, 0.5, 0.0)
-        Collider::cuboid(1.0, 1.0,1.0)
-        RigidBody::Static
-        --
-        PointLight {
-            shadow_maps_enabled: true,
-        }
-        Transform::from_xyz(4.0, 8.0, 4.0)
-        --
-        // Camera3d
-        Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y)
     }
 }
