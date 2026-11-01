@@ -38,6 +38,7 @@
               packages.rust-toolchain.develop
               packages.dioxus-cli.develop
               packages.bevy-cli.develop
+              pkgs.inotify-tools
             ];
           };
         };
