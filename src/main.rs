@@ -8,10 +8,12 @@ use bevy_enhanced_input::EnhancedInputPlugin;
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
 mod camera;
+mod cauldron;
 mod default_scene;
 mod pickups;
 mod player;
 mod prelude;
+mod rand;
 
 #[allow(unused)]
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
@@ -36,6 +38,8 @@ fn main() {
             default_scene::default_scene_plugin,
             pickups::pickups_plugin,
             camera::camera_plugin,
+            cauldron::cauldron_plugin,
+            rand::rand_plugin,
             FrameTimeDiagnosticsPlugin::default(),
         ))
         .add_loading_state(

@@ -9,6 +9,7 @@ bevy-inspector-egui = { version = "0.38.0", default-features = false, features =
 bevy_ahoy = { git = "https://github.com/catornot/bevy_ahoy.git", branch = "0.20", version = "0.2.0" }
 bevy_asset_loader = "0.28.1"
 bevy_enhanced_input = "0.27.2"
+rand = "0.10.3"
 
 [profile.dev]
 opt-level = 0
