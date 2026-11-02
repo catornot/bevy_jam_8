@@ -7,6 +7,8 @@ use bevy_asset_loader::prelude::*;
 use bevy_enhanced_input::EnhancedInputPlugin;
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
+mod backpack;
+mod bounding_polyhedron;
 mod camera;
 mod cauldron;
 mod default_scene;
@@ -34,13 +36,17 @@ fn main() {
             AhoyPlugins::default(),
             EguiPlugin::default(),
             WorldInspectorPlugin::new(),
+            FrameTimeDiagnosticsPlugin::default(),
+        ))
+        .add_plugins((
             player::player_plugin,
             default_scene::default_scene_plugin,
             pickups::pickups_plugin,
             camera::camera_plugin,
             cauldron::cauldron_plugin,
             rand::rand_plugin,
-            FrameTimeDiagnosticsPlugin::default(),
+            bounding_polyhedron::bounding_polyhedron_plugin,
+            backpack::backpack_plugin,
         ))
         .add_loading_state(
             LoadingState::new(GlobalStates::AssetLoading)
