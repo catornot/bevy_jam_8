@@ -31,11 +31,46 @@ fn ground_scene(size: f32, asset_server: &AssetServer) -> impl Scene {
         ..default()
     };
 
+    let wall_colour = Color::srgb_u8(80, 65, 40);
+
     bsn! {
+        #Ground
         Mesh3d(asset_value(Cuboid::new(size, 1.0, size)))
         MeshMaterial3d::<StandardMaterial>(asset_value(standard_material))
         Collider::cuboid(size, 1.0, size)
         RigidBody::Static
+        Children [
+            Name("Wall+Z")
+            Mesh3d(asset_value(Cuboid::new(size, 10.0, 1.0)))
+            MeshMaterial3d::<StandardMaterial>(asset_value(wall_colour))
+            Transform::from_xyz(0., 0., size/2.)
+            Collider::cuboid(size, 10.0, 1.0)
+            RigidBody::Static
+        ]
+        Children [
+            Name("Wall+X")
+            Mesh3d(asset_value(Cuboid::new(1.0, 10.0, size)))
+            MeshMaterial3d::<StandardMaterial>(asset_value(wall_colour))
+            Transform::from_xyz(size/2., 0., 0.)
+            Collider::cuboid(1.0, 10.0, size)
+            RigidBody::Static
+        ]
+        Children [
+            Name("Wall-Z")
+            Mesh3d(asset_value(Cuboid::new(size, 10.0, 1.0)))
+            MeshMaterial3d::<StandardMaterial>(asset_value(wall_colour))
+            Transform::from_xyz(0., 0., -size/2.)
+            Collider::cuboid(size, 10.0, 1.0)
+            RigidBody::Static
+        ]
+        Children [
+            Name("Wall-X")
+            Mesh3d(asset_value(Cuboid::new(1.0, 10.0, size)))
+            MeshMaterial3d::<StandardMaterial>(asset_value(wall_colour))
+            Transform::from_xyz(-size/2., 0., 0.)
+            Collider::cuboid(1.0, 10.0, size)
+            RigidBody::Static
+        ]
     }
 }
 
