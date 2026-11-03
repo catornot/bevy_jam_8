@@ -16,6 +16,7 @@ mod pickups;
 mod player;
 mod prelude;
 mod rand;
+mod fox;
 
 #[allow(unused)]
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
@@ -47,13 +48,15 @@ fn main() {
             rand::rand_plugin,
             bounding_polyhedron::bounding_polyhedron_plugin,
             backpack::backpack_plugin,
+            fox::fox_plugin,
         ))
         .add_loading_state(
             LoadingState::new(GlobalStates::AssetLoading)
                 .continue_to_state(GlobalStates::Game)
                 .load_collection::<player::PlayerAssets>()
                 .load_collection::<default_scene::Cubemap>()
-                .load_collection::<pickups::berries::BerryAssets>(),
+                .load_collection::<pickups::berries::BerryAssets>()
+                .load_collection::<fox::FoxAssets>(),
         )
         .init_state::<GlobalStates>()
         .run();
