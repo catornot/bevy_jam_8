@@ -1,11 +1,12 @@
 use bevy::prelude::*;
 use bevy_asset_loader::asset_collection::AssetCollection;
 
-use crate::GlobalStates;
+use crate::{GlobalStates, player::Player};
 
 pub fn fox_plugin(app: &mut App) {
     app.register_type::<Fox>()
-        .add_systems(OnEnter(GlobalStates::Game), spawn_fox);
+        .add_systems(OnEnter(GlobalStates::Game), spawn_fox)
+        .add_systems(Update, hunt_player);
 }
 
 #[derive(AssetCollection, Resource)]
@@ -17,13 +18,25 @@ pub struct FoxAssets {
 #[derive(Component, Default, Clone, Reflect)]
 pub struct Fox;
 
-pub fn spawn_fox(
-    mut command: Commands,
-    fox_assets: Res<FoxAssets>,
+pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
+    command.spawn_scene(bsn! {
+            #Fox
+            Fox
+            WorldAssetRoot({fox_assets.fox_scene.clone()})
+            Transform::from_xyz(0.0, 2.0, 0.0).with_scale(Vec3::splat(0.05))
+    });
+}
+
+pub fn hunt_player(
+    foxes: Query<&mut Transform, With<Fox>>,
+    players: Query<&Transform, (With<Player>, Without<Fox>)>,
+    time: Res<Time>,
 ) {
-        command.spawn_scene(bsn! {
-                #Fox
-                WorldAssetRoot({fox_assets.fox_scene.clone()})
-                Transform::from_xyz(0.0, 2.0, 0.0).with_scale(Vec3::splat(0.1))
-        });
+    for mut fox_transform in foxes {
+        for player_transform in players {
+            fox_transform.translation = fox_transform
+                .translation
+                .lerp(player_transform.translation, time.delta_secs());
+        }
+    }
 }
