@@ -21,10 +21,10 @@ pub fn default_scene_plugin(app: &mut App) {
 
 fn scene(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_scene_list(other_scene());
-    commands.spawn_scene(ground_scene(100., &asset_server));
+    commands.spawn_scene_list(ground_scene(100., &asset_server));
 }
 
-fn ground_scene(size: f32, asset_server: &AssetServer) -> impl Scene {
+fn ground_scene(size: f32, asset_server: &AssetServer) -> impl SceneList {
     let standard_material = StandardMaterial {
         base_color: Color::WHITE,
         base_color_texture: Some(asset_server.load("ground.png")),
@@ -33,44 +33,45 @@ fn ground_scene(size: f32, asset_server: &AssetServer) -> impl Scene {
 
     let wall_colour = Color::srgb_u8(80, 65, 40);
 
-    bsn! {
+    bsn_list! {
         #Ground
         Mesh3d(asset_value(Cuboid::new(size, 1.0, size)))
         MeshMaterial3d::<StandardMaterial>(asset_value(standard_material))
         Collider::cuboid(size, 1.0, size)
         RigidBody::Static
-        Children [
-            Name("Wall+Z")
-            Mesh3d(asset_value(Cuboid::new(size, 10.0, 1.0)))
-            MeshMaterial3d::<StandardMaterial>(asset_value(wall_colour))
-            Transform::from_xyz(0., 0., size/2.)
-            Collider::cuboid(size, 10.0, 1.0)
-            RigidBody::Static
-        ]
-        Children [
-            Name("Wall+X")
-            Mesh3d(asset_value(Cuboid::new(1.0, 10.0, size)))
-            MeshMaterial3d::<StandardMaterial>(asset_value(wall_colour))
-            Transform::from_xyz(size/2., 0., 0.)
-            Collider::cuboid(1.0, 10.0, size)
-            RigidBody::Static
-        ]
-        Children [
-            Name("Wall-Z")
-            Mesh3d(asset_value(Cuboid::new(size, 10.0, 1.0)))
-            MeshMaterial3d::<StandardMaterial>(asset_value(wall_colour))
-            Transform::from_xyz(0., 0., -size/2.)
-            Collider::cuboid(size, 10.0, 1.0)
-            RigidBody::Static
-        ]
-        Children [
-            Name("Wall-X")
-            Mesh3d(asset_value(Cuboid::new(1.0, 10.0, size)))
-            MeshMaterial3d::<StandardMaterial>(asset_value(wall_colour))
-            Transform::from_xyz(-size/2., 0., 0.)
-            Collider::cuboid(1.0, 10.0, size)
-            RigidBody::Static
-        ]
+        CollisionLayers::new(GameLayer::Ground, LayerMask::ALL)
+        --
+        Name("Wall+Z")
+        Mesh3d(asset_value(Cuboid::new(size, 10.0, 1.0)))
+        MeshMaterial3d::<StandardMaterial>(asset_value(wall_colour))
+        Transform::from_xyz(0., 0., size/2.)
+        Collider::cuboid(size, 10.0, 1.0)
+        RigidBody::Static
+        CollisionLayers::new(GameLayer::Ground, LayerMask::ALL)
+        --
+        Name("Wall+X")
+        Mesh3d(asset_value(Cuboid::new(1.0, 10.0, size)))
+        MeshMaterial3d::<StandardMaterial>(asset_value(wall_colour))
+        Transform::from_xyz(size/2., 0., 0.)
+        Collider::cuboid(1.0, 10.0, size)
+        RigidBody::Static
+        CollisionLayers::new(GameLayer::Ground, LayerMask::ALL)
+        --
+        Name("Wall-Z")
+        Mesh3d(asset_value(Cuboid::new(size, 10.0, 1.0)))
+        MeshMaterial3d::<StandardMaterial>(asset_value(wall_colour))
+        Transform::from_xyz(0., 0., -size/2.)
+        Collider::cuboid(size, 10.0, 1.0)
+        RigidBody::Static
+        CollisionLayers::new(GameLayer::Ground, LayerMask::ALL)
+        --
+        Name("Wall-X")
+        Mesh3d(asset_value(Cuboid::new(1.0, 10.0, size)))
+        MeshMaterial3d::<StandardMaterial>(asset_value(wall_colour))
+        Transform::from_xyz(-size/2., 0., 0.)
+        Collider::cuboid(1.0, 10.0, size)
+        RigidBody::Static
+        CollisionLayers::new(GameLayer::Ground, LayerMask::ALL)
     }
 }
 

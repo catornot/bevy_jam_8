@@ -13,7 +13,12 @@ pub fn pickups_plugin(app: &mut App) {
 }
 
 #[derive(Component, Clone, Copy, Default)]
-#[require(RigidBody, Collider, Interactable)]
+#[require(
+    RigidBody,
+    Collider,
+    Interactable,
+    CollisionLayers::new(GameLayer::Pickups, LayerMask::ALL)
+)]
 pub struct Pickup;
 
 pub fn spawn_pickups(mut commands: Commands, berry: Res<BerryAssets>) {

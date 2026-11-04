@@ -1,4 +1,4 @@
 pub(crate) use bevy::log;
 pub(crate) use bevy_asset_loader::prelude::*;
 
-pub(crate) use crate::GlobalStates;
+pub(crate) use crate::{GameLayer, GlobalStates};

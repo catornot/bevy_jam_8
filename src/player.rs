@@ -23,6 +23,7 @@ use crate::{
 };
 
 #[derive(Component, Default, Clone, Reflect)]
+#[require(CollisionLayers::new(GameLayer::Player, LayerMask::ALL,))]
 pub struct Player;
 
 #[derive(Component, Default, Clone, Reflect)]

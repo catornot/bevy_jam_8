@@ -73,10 +73,6 @@ impl BackpackAttachment {
 pub struct Backpacked(Entity);
 
 impl Backpacked {
-    pub fn new(backpack_ent: Entity) -> Self {
-        Self(backpack_ent)
-    }
-
     fn on_add(mut world: DeferredWorld<'_>, ctx: HookContext) {
         let mut commands = world.commands();
         let Ok(mut ent_cmds) = commands.get_entity(ctx.entity) else {
@@ -116,8 +112,11 @@ fn deposit_in_backpack(
 
     for ent in for_pickup {
         if let Ok(mut cmds) = commands.get_entity(ent) {
-            cmds.insert(Backpacked::new(trigger.context));
             cmds.insert(MovingToBackpack);
+        }
+
+        if let Ok(mut cmds) = commands.get_entity(trigger.context) {
+            cmds.add_one_related::<Backpacked>(ent);
         }
     }
 }

@@ -4,7 +4,7 @@ use bevy::{
     render::render_resource::AsBindGroup, shader::ShaderRef,
 };
 use bevy_enhanced_input::prelude::*;
-use std::f32::consts::{FRAC_PI_2, PI};
+use std::f32::consts::FRAC_PI_2;
 
 use crate::{
     backpack::{Backpack, BackpackAttachment, BackpackConstraints, Backpacked, MovingToBackpack},
@@ -19,11 +19,12 @@ const SHADER_ASSET_PATH: &str = "shaders/potion_shader.wesl";
 pub fn cauldron_plugin(app: &mut App) {
     app.add_plugins(MaterialPlugin::<PotionMaterial>::default())
         .add_systems(OnEnter(GlobalStates::Game), spawn_cauldron)
-        .add_systems(Update, sync_color)
+        .add_systems(Update, (sync_color, drop_items))
         .add_observer(deposit_in_cauldron);
 }
 
 #[derive(Component, Clone, FromTemplate)]
+#[require(CollisionLayers::new(GameLayer::Cauldron, LayerMask::ALL))]
 pub struct Cauldron(Color);
 
 #[derive(AssetCollection, Resource)]
@@ -95,16 +96,38 @@ fn deposit_in_cauldron(
     };
 
     for (mut transform, ent, backpacked) in &mut picked_up {
-        if let Ok(mut cmds) = commands.get_entity(ent)
-            && backpacked.get() == trigger.context
-        {
-            cmds.insert(Backpacked::new(cauldron));
-            cmds.insert(MovingToBackpack);
-            cmds.remove::<ChildOf>();
+        if backpacked.get() == trigger.context {
+            commands.entity(cauldron).add_one_related::<Backpacked>(ent);
+            commands.entity(ent).insert(MovingToBackpack);
+            commands.entity(ent).remove::<ChildOf>();
+
+            if let Ok(parent_transform) = parents.get(backpacked.get()) {
+                transform.translation = parent_transform.transform_point(transform.translation);
+            }
+        }
+    }
+}
+
+fn drop_items(
+    mut commands: Commands,
+    attached: Query<(&Backpacked, Entity), Without<MovingToBackpack>>,
+    cauldrons: Query<(), With<Cauldron>>,
+) {
+    for (parent, ent) in attached {
+        if cauldrons.get(parent.get()).is_err() {
+            continue;
         }
 
-        if let Ok(parent_transform) = parents.get(backpacked.get()) {
-            transform.translation = parent_transform.transform_point(transform.translation);
+        if let Ok(mut cauldron_cmds) = commands.get_entity(ent) {
+            cauldron_cmds.remove_related::<Backpacked>(&[ent]);
+            cauldron_cmds.detach_child(ent);
+        }
+
+        if let Ok(mut pickups_cmds) = commands.get_entity(ent) {
+            let mask =
+                (LayerMask::ALL & !GameLayer::Pickups.to_bits()) & !GameLayer::Cauldron.to_bits();
+            pickups_cmds.insert(CollisionLayers::new(GameLayer::Pickups, mask));
+            pickups_cmds.remove::<Backpacked>();
         }
     }
 }

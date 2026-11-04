@@ -29,6 +29,17 @@ enum GlobalStates {
     Game,
 }
 
+#[derive(PhysicsLayer, Default)]
+enum GameLayer {
+    #[default]
+    Default,
+    Player,
+    // Enemy,
+    Ground,
+    Cauldron,
+    Pickups,
+    Trigger,
+}
 fn main() {
     App::new()
         .add_plugins((
