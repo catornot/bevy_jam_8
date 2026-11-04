@@ -1,4 +1,3 @@
-use std::ops::{Add, Sub};
 
 use bevy::{math::FloatPow, prelude::*};
 use bevy_asset_loader::asset_collection::AssetCollection;
@@ -47,7 +46,7 @@ pub fn hunt_player(
 ) {
     for mut fox_transform in foxes {
         for player_transform in players {
-            let displacement = (player_transform.translation - fox_transform.translation);
+            let displacement = player_transform.translation - fox_transform.translation;
             fox_transform.translation +=
                 displacement.normalize() * fox_resource.speed * time.delta_secs();
 
