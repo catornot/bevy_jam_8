@@ -1,7 +1,4 @@
-import bevy_pbr::render::{
-    mesh_view_bindings::globals,
-    forward_io::VertexOutput,
-};
+import bevy_pbr::render::{forward_io::VertexOutput, mesh_view_bindings::globals};
 import bevy_render::maths::PI;
 
 fn oklab_to_linear_srgb(c: vec3<f32>) -> vec3<f32> {
@@ -18,10 +15,10 @@ fn oklab_to_linear_srgb(c: vec3<f32>) -> vec3<f32> {
     let s = s_ * s_ * s_;
 
     return vec3<f32>(
-        4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-        -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
-    );
+            4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+            -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+            -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+        );
 }
 
 struct PotionMaterial {
@@ -52,9 +49,10 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     // let mixed = mix(mix(red, blue, t_1), mix(green, white, t_2), distance_to_center);
 
     var color = material.color.xyz;
-    for (var i = 0; i < 4; i++) {
+    for(var i = 0; i < 4; i++) {
         if any(material.uv_space_positions[i].xy != vec2<f32>(0.)) {
-            let dist = distance(in.uv, material.uv_space_positions[i].xy) / max(material.uv_space_positions[i].z, 1.0);
+            let dist = distance(in.uv, material.uv_space_positions[i].xy)
+                / max(material.uv_space_positions[i].z, 1.0);
             color = vec3<f32>(color.x, color.y * clamp(dist * 2., 0., 1.), color.z);
             break;
         }

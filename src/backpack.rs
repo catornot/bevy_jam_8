@@ -37,6 +37,7 @@ pub struct BackpackConstraints {
     pub x: Interval,
     pub y: Interval,
     pub z: Interval,
+    pub static_dir: Option<Dir3>,
 }
 
 impl Default for BackpackConstraints {
@@ -48,6 +49,7 @@ impl Default for BackpackConstraints {
             x,
             y,
             z: y,
+            static_dir: None,
         }
     }
 }
@@ -136,21 +138,26 @@ fn calculate_backpacking_info(
                     return None;
                 };
 
-                let constraints = [constraints.x, constraints.y, constraints.z];
-                let dir = Dir3::new(Vec3::from(
-                    rand.random::<Vec3>()
-                        .clamp(Vec3::splat(0.), Vec3::splat(1.))
-                        .to_array()
-                        .into_iter()
-                        .zip(constraints)
-                        .map(|(x, c)| x * c.length() + c.start())
-                        .fold((0, [0f32; 3]), |mut acc, x| {
-                            acc.1[acc.0] = x;
-                            (acc.0 + 1, acc.1)
-                        })
-                        .1,
-                ))
-                .unwrap_or(Dir3::Y);
+                let constraints_array = [constraints.x, constraints.y, constraints.z];
+                let dir = constraints
+                    .static_dir
+                    .or_else(|| {
+                        Dir3::new(Vec3::from(
+                            rand.random::<Vec3>()
+                                .clamp(Vec3::splat(0.), Vec3::splat(1.))
+                                .to_array()
+                                .into_iter()
+                                .zip(constraints_array)
+                                .map(|(x, c)| x * c.length() + c.start())
+                                .fold((0, [0f32; 3]), |mut acc, x| {
+                                    acc.1[acc.0] = x;
+                                    (acc.0 + 1, acc.1)
+                                })
+                                .1,
+                        ))
+                        .ok()
+                    })
+                    .unwrap_or(Dir3::Y);
 
                 // this is in the space of the model
                 let offset = dir * 20.;
@@ -237,19 +244,19 @@ fn move_to_backpack(
         transform
             .translation
             .x
-            .smooth_nudge(&target.x, 10f32.ln(), time.delta_secs());
+            .smooth_nudge(&target.x, 100f32.ln(), time.delta_secs() * 2.);
         transform.translation.y.smooth_nudge(
             &(target.y
                 + (-(distance / backpacking_info.starting_distance + 1.).powi(2))
                     .mul_add(3., 3.)
                     .clamp(0., 3.)),
-            10f32.ln(),
-            time.delta_secs(),
+            100f32.ln(),
+            time.delta_secs() * 2.,
         );
         transform
             .translation
             .z
-            .smooth_nudge(&target.z, 10f32.ln(), time.delta_secs());
+            .smooth_nudge(&target.z, 100f32.ln(), time.delta_secs() * 2.);
 
         gizmos.line(transform.translation, target, Color::WHITE);
 

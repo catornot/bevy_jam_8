@@ -32,13 +32,6 @@ pub struct CauldronAssets {
     cauldron: Handle<WorldAsset>,
 }
 
-const fn constraint() -> Interval {
-    match interval(PI, PI + 0.01) {
-        Ok(i) => i,
-        Err(_) => panic!(),
-    }
-}
-
 fn spawn_cauldron(
     mut commands: Commands,
     cauldron_assets: Res<CauldronAssets>,
@@ -67,9 +60,7 @@ fn spawn_cauldron(
         ]
         Backpack
         BackpackConstraints {
-            x: constraint(),
-            y: constraint(),
-            z: constraint(),
+            static_dir: {Some(Dir3::Y)}
         }
     });
 }
