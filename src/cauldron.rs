@@ -4,10 +4,14 @@ use bevy::{
     render::render_resource::AsBindGroup, shader::ShaderRef,
 };
 use bevy_enhanced_input::prelude::*;
-use std::f32::consts::{FRAC_PI_2, FRAC_PI_3, PI};
+use std::f32::consts::{FRAC_PI_2, PI};
 
 use crate::{
-    backpack::{Backpack, BackpackAttachment, BackpackConstraints, Backpacked, MovingToBackpack}, bounding_polyhedron::{BoundingPolyhedronMarker, BoundingPolyhedronSkipMarker}, interactable::{Interactable, Selected, UseAction}, pickups::Pickup, prelude::*,
+    backpack::{Backpack, BackpackAttachment, BackpackConstraints, Backpacked, MovingToBackpack},
+    bounding_polyhedron::{BoundingPolyhedronMarker, BoundingPolyhedronSkipMarker},
+    interactable::{Interactable, Selected, UseAction},
+    pickups::Pickup,
+    prelude::*,
 };
 
 const SHADER_ASSET_PATH: &str = "shaders/potion_shader.wesl";
@@ -63,8 +67,8 @@ fn spawn_cauldron(
         ]
         Backpack
         BackpackConstraints {
-            y: constraint(), 
-            z: constraint(), 
+            y: constraint(),
+            z: constraint(),
         }
     });
 }
@@ -86,7 +90,10 @@ fn deposit_in_cauldron(
     mut commands: Commands,
     cauldrons: Query<Entity, (With<Cauldron>, With<Selected>)>,
     parents: Query<&GlobalTransform, Or<(With<Backpack>, With<BackpackAttachment>)>>,
-    mut picked_up: Query<(&mut Transform, Entity, &Backpacked), (With<Pickup>, Without<MovingToBackpack>)>,
+    mut picked_up: Query<
+        (&mut Transform, Entity, &Backpacked),
+        (With<Pickup>, Without<MovingToBackpack>),
+    >,
 ) {
     if !trigger.value {
         return;
@@ -106,7 +113,7 @@ fn deposit_in_cauldron(
 
         if let Ok(parent_transform) = parents.get(backpacked.get()) {
             transform.translation = parent_transform.transform_point(transform.translation);
-        } 
+        }
     }
 }
 
