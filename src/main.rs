@@ -18,6 +18,7 @@ mod pickups;
 mod player;
 mod prelude;
 mod rand;
+mod wood_grain;
 
 #[allow(unused)]
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
@@ -51,6 +52,7 @@ fn main() {
             backpack::backpack_plugin,
             fox::fox_plugin,
             interactable::interactable_plugin,
+            wood_grain::wood_grain_plugin,
         ))
         .add_loading_state(
             LoadingState::new(GlobalStates::AssetLoading)

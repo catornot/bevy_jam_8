@@ -26,7 +26,6 @@ fn oklab_to_linear_srgb(c: vec3<f32>) -> vec3<f32> {
 
 struct PotionMaterial {
     color: vec4<f32>,
-
     uv_space_positions: array<vec3<f32>, 8>,
 }
 
@@ -43,8 +42,6 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let t_1 = 1.;
     let t_2 = 2.;
 
-    
-
     // let distance_to_center = distance(in.uv, vec3<f32>(0.5)) * 1.4;
 
     // blending is done in a perceptual color space: https://bottosson.github.io/posts/oklab/
@@ -54,9 +51,9 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let white = vec3<f32>(1.0, 0.0, 0.0);
     // let mixed = mix(mix(red, blue, t_1), mix(green, white, t_2), distance_to_center);
 
-    var color= material.color.xyz;
+    var color = material.color.xyz;
     for (var i = 0; i < 4; i++) {
-        if (any(material.uv_space_positions[i].xy != vec2<f32>(0.))) {
+        if any(material.uv_space_positions[i].xy != vec2<f32>(0.)) {
             let dist = distance(in.uv, material.uv_space_positions[i].xy) / max(material.uv_space_positions[i].z, 1.0);
             color = vec3<f32>(color.x, color.y * clamp(dist * 2., 0., 1.), color.z);
             break;
