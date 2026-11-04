@@ -4,12 +4,7 @@ use std::{
 };
 
 use bevy::prelude::*;
-use rand::{SeedableRng, rngs::Xoshiro128PlusPlus};
-
-#[derive(Resource)]
-pub struct Rand {
-    algo: Xoshiro128PlusPlus,
-}
+use rand::{Rng, SeedableRng, rngs::Xoshiro128PlusPlus};
 
 pub fn rand_plugin(app: &mut App) {
     app.insert_resource(Rand {
@@ -20,7 +15,13 @@ pub fn rand_plugin(app: &mut App) {
                 .as_secs() as u128)
                 .to_ne_bytes(),
         ),
-    });
+    })
+    .add_systems(Update, seed_randomizer);
+}
+
+#[derive(Resource)]
+pub struct Rand {
+    algo: Xoshiro128PlusPlus,
 }
 
 impl Deref for Rand {
@@ -35,4 +36,11 @@ impl DerefMut for Rand {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.algo
     }
+}
+
+fn seed_randomizer(mut rand: ResMut<Rand>, keys_pressed: Res<ButtonInput<KeyCode>>) {
+    _ = rand.algo.next_u32();
+    keys_pressed
+        .get_pressed()
+        .for_each(|_| _ = rand.algo.next_u64());
 }

@@ -27,7 +27,7 @@ fn oklab_to_linear_srgb(c: vec3<f32>) -> vec3<f32> {
 struct PotionMaterial {
     color: vec4<f32>,
 
-    uv_space_positions: array<vec3<f32>, 4>,
+    uv_space_positions: array<vec3<f32>, 8>,
 }
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(1)

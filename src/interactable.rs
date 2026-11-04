@@ -1,25 +1,38 @@
 use avian3d::{parry::utils::hashset::HashSet, prelude::*};
 use bevy::prelude::*;
+use bevy_enhanced_input::prelude::*;
 
 use crate::prelude::*;
 
 const MAX_INTERACT_DIST: f32 = 5.;
 
-#[derive(Component, Clone, Copy, Default)]
+pub fn interactable_plugin(app: &mut App) {
+    app.register_type::<Interactable>()
+        .register_type::<Selected>()
+        .register_type::<InteractableRayCaster>()
+        .register_type::<UseAction>()
+        .register_type::<Interacted>()
+        .add_systems(
+            Update,
+            (set_selected_intractable_s, highlight_selected).run_if(in_state(GlobalStates::Game)),
+        );
+}
+
+#[derive(Component, Clone, Copy, Default, Reflect)]
 pub struct InteractableRayCaster;
 
-#[derive(Component, Clone, Copy, Default)]
+#[derive(Component, Clone, Copy, Default, Reflect)]
 pub struct Interactable;
 
-#[derive(Component, Clone, Copy, Default)]
+#[derive(Component, Clone, Copy, Default, Reflect)]
 pub struct Selected;
 
-pub fn interactable_plugin(app: &mut App) {
-    app.add_systems(
-        Update,
-        (set_selected_intractable_s, highlight_selected).run_if(in_state(GlobalStates::Game)),
-    );
-}
+#[derive(Event, Clone, Copy, Default, Reflect)]
+pub struct Interacted;
+
+#[derive(Debug, InputAction, Reflect)]
+#[action_output(bool)]
+pub struct UseAction;
 
 pub fn highlight_selected(pickups: Query<&Transform, With<Selected>>, mut gizmos: Gizmos) {
     for transform in pickups {
@@ -35,7 +48,7 @@ pub fn highlight_selected(pickups: Query<&Transform, With<Selected>>, mut gizmos
 }
 
 pub fn set_selected_intractable_s(
-    mut command: Commands,
+    mut commands: Commands,
     players: Query<(&RayCaster, &RayHits), With<InteractableRayCaster>>,
     pickups_highlighting: Query<Entity, (With<Interactable>, Without<Selected>)>, // stuff to highlight
     pickups_non_highlighting: Query<Entity, (With<Interactable>, With<Selected>)>, // highlighted stuff
@@ -55,7 +68,7 @@ pub fn set_selected_intractable_s(
     }) {
         highlighted_pickups.insert(target);
         if pickups_highlighting.get(target).is_ok()
-            && let Ok(mut ent) = command.get_entity(target)
+            && let Ok(mut ent) = commands.get_entity(target)
         {
             ent.insert(Selected);
         }
@@ -65,7 +78,7 @@ pub fn set_selected_intractable_s(
         .into_iter()
         .filter(|ent| !highlighted_pickups.contains(ent))
     {
-        if let Ok(mut commands) = command.get_entity(ent) {
+        if let Ok(mut commands) = commands.get_entity(ent) {
             commands.remove::<Selected>();
         }
     }

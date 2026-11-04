@@ -15,10 +15,10 @@ use bevy_enhanced_input::{
 };
 
 use crate::{
-    backpack::{Backpack, BackpackAttachment, PickupItem},
+    backpack::{Backpack, BackpackAttachment},
     bounding_polyhedron::BoundingPolyhedronMarker,
     camera::{CameraDistance, CameraZoom, CharacterControllerCamera, CharacterControllerCameraOf},
-    interactable::InteractableRayCaster,
+    interactable::{InteractableRayCaster, UseAction},
     prelude::*,
 };
 
@@ -128,7 +128,7 @@ pub fn spawn_player(
                         {cardinal::dpad()}
                     ]
                     --
-                    Action::<PickupItem>::new()
+                    Action::<UseAction>::new()
                     ~Hold::new(0.0)
                     Bindings [
                         Binding(MouseButton::Left)

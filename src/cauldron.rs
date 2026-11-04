@@ -1,14 +1,13 @@
-use std::f32::consts::FRAC_PI_2;
-
 use avian3d::prelude::*;
 use bevy::{
-    prelude::*, reflect::TypePath, render::render_resource::AsBindGroup, shader::ShaderRef,
+    ecs::relationship::Relationship, prelude::*, reflect::TypePath,
+    render::render_resource::AsBindGroup, shader::ShaderRef,
 };
+use bevy_enhanced_input::prelude::*;
+use std::f32::consts::{FRAC_PI_2, FRAC_PI_3, PI};
 
 use crate::{
-    bounding_polyhedron::{BoundingPolyhedronMarker, BoundingPolyhedronSkipMarker},
-    interactable::Interactable,
-    prelude::*,
+    backpack::{Backpack, BackpackAttachment, BackpackConstraints, Backpacked, MovingToBackpack}, bounding_polyhedron::{BoundingPolyhedronMarker, BoundingPolyhedronSkipMarker}, interactable::{Interactable, Selected, UseAction}, pickups::Pickup, prelude::*,
 };
 
 const SHADER_ASSET_PATH: &str = "shaders/potion_shader.wesl";
@@ -16,7 +15,8 @@ const SHADER_ASSET_PATH: &str = "shaders/potion_shader.wesl";
 pub fn cauldron_plugin(app: &mut App) {
     app.add_plugins(MaterialPlugin::<PotionMaterial>::default())
         .add_systems(OnEnter(GlobalStates::Game), spawn_cauldron)
-        .add_systems(Update, (move_point, sync_color));
+        .add_systems(Update, sync_color)
+        .add_observer(deposit_in_cauldron);
 }
 
 #[derive(Component, Clone, FromTemplate)]
@@ -28,6 +28,13 @@ pub struct CauldronAssets {
     cauldron: Handle<WorldAsset>,
 }
 
+const fn constraint() -> Interval {
+    match interval(PI, PI + 0.01) {
+        Ok(i) => i,
+        Err(_) => panic!(),
+    }
+}
+
 fn spawn_cauldron(
     mut commands: Commands,
     cauldron_assets: Res<CauldronAssets>,
@@ -36,7 +43,7 @@ fn spawn_cauldron(
 ) {
     let material = PotionMaterial {
         color: Vec4::new(0.86644, -0.233887, 0.179498, 0.),
-        positions: [Vec2::new(0., 0.5).extend(1.); 4],
+        positions: [Vec2::new(0., 0.5).extend(1.); 8],
     };
     commands.spawn_scene(bsn! {
         #Cauldron
@@ -54,6 +61,11 @@ fn spawn_cauldron(
             Mesh3d({meshes.add(Circle::new(0.9))})
             MeshMaterial3d<PotionMaterial>({materials.add(material)})
         ]
+        Backpack
+        BackpackConstraints {
+            y: constraint(), 
+            z: constraint(), 
+        }
     });
 }
 
@@ -69,18 +81,32 @@ fn sync_color(
     }
 }
 
-fn move_point(
-    query: Query<&MeshMaterial3d<PotionMaterial>>,
-    mut materials: ResMut<Assets<PotionMaterial>>,
-    time: Res<Time>,
+fn deposit_in_cauldron(
+    trigger: On<Fire<UseAction>>,
+    mut commands: Commands,
+    cauldrons: Query<Entity, (With<Cauldron>, With<Selected>)>,
+    parents: Query<&GlobalTransform, Or<(With<Backpack>, With<BackpackAttachment>)>>,
+    mut picked_up: Query<(&mut Transform, Entity, &Backpacked), (With<Pickup>, Without<MovingToBackpack>)>,
 ) {
-    for material in query {
-        if let Some(mut potion) = materials.get_mut(material.id()) {
-            potion.positions = potion.positions.map(|mut v| {
-                v.x += time.delta_secs();
-                if v.x > 1.0 { Vec3::ZERO } else { v }
-            });
+    if !trigger.value {
+        return;
+    }
+    let Some(cauldron) = cauldrons.into_iter().next() else {
+        return;
+    };
+
+    for (mut transform, ent, backpacked) in &mut picked_up {
+        if let Ok(mut cmds) = commands.get_entity(ent)
+            && backpacked.get() == trigger.context
+        {
+            cmds.insert(Backpacked::new(cauldron));
+            cmds.insert(MovingToBackpack);
+            cmds.remove::<ChildOf>();
         }
+
+        if let Ok(parent_transform) = parents.get(backpacked.get()) {
+            transform.translation = parent_transform.transform_point(transform.translation);
+        } 
     }
 }
 
@@ -90,7 +116,7 @@ struct PotionMaterial {
     color: Vec4,
 
     #[uniform(1)]
-    positions: [Vec3; 4],
+    positions: [Vec3; 8],
 }
 
 impl Material for PotionMaterial {

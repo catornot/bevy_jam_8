@@ -10,26 +10,45 @@ use bevy_enhanced_input::prelude::*;
 use rand::RngExt;
 use std::{borrow::Cow, f32::consts::PI};
 
-use crate::{bounding_polyhedron::BoundingPolyhedron, interactable::Selected};
+use crate::{
+    bounding_polyhedron::BoundingPolyhedron,
+    interactable::{Selected, UseAction},
+};
 use crate::{pickups::Pickup, rand::Rand};
 
 pub fn backpack_plugin(app: &mut App) {
     app.register_type::<Backpack>()
         .register_type::<Backpacked>()
-        .register_type::<PickupItem>()
         .add_systems(Update, (move_to_backpack, calculate_backpacking_info))
         .add_observer(deposit_in_backpack);
 }
 
-#[derive(Debug, InputAction, Reflect)]
-#[action_output(bool)]
-pub struct PickupItem;
-
 #[derive(Debug, Component, Default, Clone, Reflect)]
 #[relationship_target(relationship = Backpacked)]
+#[require(BackpackConstraints)]
 pub struct Backpack {
     #[relationship]
     items: Vec<Entity>,
+}
+
+#[derive(Debug, Component, Clone, Reflect)]
+pub struct BackpackConstraints {
+    pub x: Interval,
+    pub y: Interval,
+    pub z: Interval,
+}
+
+impl Default for BackpackConstraints {
+    #[rustfmt::skip]
+    fn default() -> Self {
+        let x = const { match interval(-PI, PI) { Ok(i) => i, Err(_) => panic!() } };
+        let y = const { match interval(0., PI) { Ok(i) => i, Err(_) => panic!() } };
+        Self {
+            x,
+            y,
+            z: y,
+        }
+    }
 }
 
 /// to which entity should items be parented
@@ -85,7 +104,7 @@ pub struct CalculatedBackpackDistance {
 }
 
 fn deposit_in_backpack(
-    trigger: On<Fire<PickupItem>>,
+    trigger: On<Fire<UseAction>>,
     mut commands: Commands,
     for_pickup: Query<Entity, (With<Selected>, With<Pickup>)>,
 ) {
@@ -104,21 +123,32 @@ fn calculate_backpacking_info(
     mut commands: Commands,
     mut rand: ResMut<Rand>,
     pickups: Query<(&Backpacked, Entity, &Transform), (Without<Backpack>, With<MovingToBackpack>)>,
-    targets: Query<(&Transform, &BoundingPolyhedron), With<Backpack>>,
+    targets: Query<(&Transform, &BoundingPolyhedron, &BackpackConstraints), With<Backpack>>,
 ) {
     for (ent, bundle) in
         pickups
             .into_iter()
             .filter_map(|(backpacked, pickup, backped_transform)| {
-                let Ok((parent_transform, bounding)) = targets.get(backpacked.get()) else {
+                let Ok((parent_transform, bounding, constraints)) = targets.get(backpacked.get())
+                else {
                     // not really possible but ok
                     return None;
                 };
 
-                let dir = Dir3::new(
-                    (rand.random::<Vec3>() * Vec3::splat(PI))
-                        .clamp(Vec3::splat(0.), Vec3::splat(PI)),
-                )
+                let constraints = [constraints.x, constraints.y, constraints.z];
+                let dir = Dir3::new(Vec3::from(
+                    rand.random::<Vec3>()
+                        .clamp(Vec3::splat(0.), Vec3::splat(1.))
+                        .to_array()
+                        .into_iter()
+                        .zip(constraints)
+                        .map(|(x, c)| x * c.length() + c.start())
+                        .fold((0, [0f32; 3]), |mut acc, x| {
+                            acc.1[acc.0] = x;
+                            (acc.0 + 1, acc.1)
+                        })
+                        .1,
+                ))
                 .unwrap_or(Dir3::Y);
 
                 // this is in the space of the model
@@ -206,24 +236,23 @@ fn move_to_backpack(
         transform
             .translation
             .x
-            .smooth_nudge(&target.x, 10f32.ln(), time.delta_secs() * 2.);
+            .smooth_nudge(&target.x, 10f32.ln(), time.delta_secs());
         transform.translation.y.smooth_nudge(
             &(target.y
-                + ((distance / backpacking_info.starting_distance) * PI)
-                    .clamp(0., PI)
-                    .sin()
-                    * 5.),
+                + (-(distance / backpacking_info.starting_distance + 1.).powi(2))
+                    .algebraic_add(1.)
+                    .clamp(0., 1.)),
             10f32.ln(),
-            time.delta_secs() * 2.,
+            time.delta_secs(),
         );
         transform
             .translation
             .z
-            .smooth_nudge(&target.z, 10f32.ln(), time.delta_secs() * 2.);
+            .smooth_nudge(&target.z, 10f32.ln(), time.delta_secs());
 
         gizmos.line(transform.translation, target, Color::WHITE);
 
-        if (target.xz() - transform.translation.xz()).length() < 0.05
+        if (target.xz() - transform.translation.xz()).length() < 0.1
             && let Ok(mut pickup_cmds) = commands.get_entity(ent)
         {
             pickup_cmds.remove::<MovingToBackpack>();
