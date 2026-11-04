@@ -39,7 +39,12 @@
               packages.dioxus-cli.develop
               packages.bevy-cli.develop
               pkgs.inotify-tools
-              pkgs.wgsl-analyzer
+              (pkgs.callPackage ./nix/wgsl-analyzer.nix {
+                rustPlatform = pkgs.makeRustPlatform {
+                  cargo = packages.rust-toolchain;
+                  rustc = packages.rust-toolchain;
+                };
+              })
             ];
           };
         };
@@ -61,6 +66,11 @@
               !(builtins.elem (baseNameOf path) [
                 "flake.lock"
                 "flake.nix"
+                "assets.sh"
+                "wesl.toml"
+                "nix/wgsl-analyzer.nix"
+                "Makefile"
+                ".vscode"
               ]);
           };
 
