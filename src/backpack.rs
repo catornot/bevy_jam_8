@@ -13,6 +13,7 @@ use std::{borrow::Cow, f32::consts::PI};
 use crate::{
     bounding_polyhedron::BoundingPolyhedron,
     interactable::{Selected, UseAction},
+    prelude::*,
 };
 use crate::{pickups::Pickup, rand::Rand};
 
@@ -67,7 +68,6 @@ impl BackpackAttachment {
 #[relationship(relationship_target = Backpack)]
 #[component(on_add = Self::on_add)]
 #[component(on_remove = Self::on_remove)]
-#[require(MovingToBackpack)]
 pub struct Backpacked(Entity);
 
 impl Backpacked {
@@ -115,6 +115,7 @@ fn deposit_in_backpack(
     for ent in for_pickup {
         if let Ok(mut cmds) = commands.get_entity(ent) {
             cmds.insert(Backpacked::new(trigger.context));
+            cmds.insert(MovingToBackpack);
         }
     }
 }
@@ -211,7 +212,7 @@ fn move_to_backpack(
             &CalculatedBackpackDistance,
             Entity,
         ),
-        Without<Backpack>,
+        (With<MovingToBackpack>, Without<Backpack>),
     >,
     targets: Query<(&Transform, Entity, Option<&BackpackAttachment>), With<Backpack>>,
     possible_attachment_target: Query<
@@ -240,8 +241,8 @@ fn move_to_backpack(
         transform.translation.y.smooth_nudge(
             &(target.y
                 + (-(distance / backpacking_info.starting_distance + 1.).powi(2))
-                    .algebraic_add(1.)
-                    .clamp(0., 1.)),
+                    .mul_add(3., 3.)
+                    .clamp(0., 3.)),
             10f32.ln(),
             time.delta_secs(),
         );
@@ -253,22 +254,20 @@ fn move_to_backpack(
         gizmos.line(transform.translation, target, Color::WHITE);
 
         if (target.xz() - transform.translation.xz()).length() < 0.1
-            && let Ok(mut pickup_cmds) = commands.get_entity(ent)
+            && let Ok(mut backpacked_cmds) = commands.get_entity(ent)
         {
-            pickup_cmds.remove::<MovingToBackpack>();
-            pickup_cmds.remove::<CalculatedBackpackDistance>();
+            backpacked_cmds.remove::<MovingToBackpack>();
+            backpacked_cmds.remove::<CalculatedBackpackDistance>();
             transform.translation = backpacking_info.offset;
 
-            if let Some(player_model_ent) = attachment_info
+            let attachment_ent = attachment_info
                 .and_then(|ent| possible_attachment_target.get(ent.0).ok().map(|(e, _)| e))
-            {
-                if let Ok(mut parent_cmds) = commands.get_entity(player_model_ent) {
-                    parent_cmds.add_child(ent);
-                }
-            } else if let Ok(mut parent_cmds) = commands.get_entity(parent_ent) {
+                .unwrap_or(parent_ent);
+
+            if let Ok(mut parent_cmds) = commands.get_entity(attachment_ent) {
                 parent_cmds.add_child(ent);
             } else {
-                bevy::log::error!("failed to assign parent to pickup : {parent_ent:?} and {ent:?}");
+                log::error!("failed to assign parent to pickup : {parent_ent:?} and {ent:?}");
             }
         }
     }

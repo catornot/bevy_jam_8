@@ -67,6 +67,7 @@ fn spawn_cauldron(
         ]
         Backpack
         BackpackConstraints {
+            x: constraint(),
             y: constraint(),
             z: constraint(),
         }
