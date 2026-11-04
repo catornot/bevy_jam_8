@@ -8,10 +8,10 @@ use bevy::{
 };
 use bevy_enhanced_input::prelude::*;
 use rand::RngExt;
-use std::f32::consts::PI;
+use std::{borrow::Cow, f32::consts::PI};
 
-use crate::bounding_polyhedron::BoundingPolyhedron;
-use crate::{pickups::HighlightPickup, rand::Rand};
+use crate::{bounding_polyhedron::BoundingPolyhedron, interactable::Selected};
+use crate::{pickups::Pickup, rand::Rand};
 
 pub fn backpack_plugin(app: &mut App) {
     app.register_type::<Backpack>()
@@ -25,15 +25,23 @@ pub fn backpack_plugin(app: &mut App) {
 #[action_output(bool)]
 pub struct PickupItem;
 
-#[derive(Component, Default, Clone, Reflect)]
+#[derive(Debug, Component, Default, Clone, Reflect)]
 #[relationship_target(relationship = Backpacked)]
 pub struct Backpack {
     #[relationship]
     items: Vec<Entity>,
-    /// to which entity should items be parented
-    /// must still exist within the backpack's space
-    /// better yet be aligned to the origin of the backpack
-    pub attachment_entity: Option<Entity>,
+}
+
+/// to which entity should items be parented
+/// must still exist within the backpack's space
+/// better yet be aligned to the origin of the backpack
+#[derive(Debug, Component, Clone, Reflect)]
+pub struct BackpackAttachment(Entity);
+
+impl BackpackAttachment {
+    pub fn new(attachment: Entity) -> Self {
+        Self(attachment)
+    }
 }
 
 #[derive(Component, Clone, Reflect)]
@@ -79,7 +87,7 @@ pub struct CalculatedBackpackDistance {
 fn deposit_in_backpack(
     trigger: On<Fire<PickupItem>>,
     mut commands: Commands,
-    for_pickup: Query<Entity, With<HighlightPickup>>,
+    for_pickup: Query<Entity, (With<Selected>, With<Pickup>)>,
 ) {
     if !trigger.value {
         return;
@@ -175,17 +183,26 @@ fn move_to_backpack(
         ),
         Without<Backpack>,
     >,
-    targets: Query<(&Transform, Entity, &Backpack), With<Backpack>>,
-    possible_attachment_target: Query<Entity>, // not sure if this is expensive
+    targets: Query<(&Transform, Entity, Option<&BackpackAttachment>), With<Backpack>>,
+    possible_attachment_target: Query<
+        (Entity, &GlobalTransform),
+        (Without<Backpack>, Without<CalculatedBackpackDistance>),
+    >, // not sure if this is expensive
     time: Res<Time>,
 ) {
     for (mut transform, backpacked, backpacking_info, ent) in moving {
-        let Ok((parent, parent_ent, backpack)) = targets.get(backpacked.get()) else {
+        let Ok((parent_transform, parent_ent, attachment_info)) = targets.get(backpacked.get())
+        else {
             continue;
         };
 
-        let distance = transform.translation.distance(parent.translation);
-        let target = parent.translation + backpacking_info.offset;
+        let parent_transform = attachment_info
+            .and_then(|ent| possible_attachment_target.get(ent.0).ok().map(|(_, t)| t))
+            .map(|global| Cow::Owned(global.compute_transform()))
+            .unwrap_or(Cow::Borrowed(parent_transform));
+
+        let distance = transform.translation.distance(parent_transform.translation);
+        let target = parent_transform.transform_point(backpacking_info.offset);
         transform
             .translation
             .x
@@ -213,9 +230,8 @@ fn move_to_backpack(
             pickup_cmds.remove::<CalculatedBackpackDistance>();
             transform.translation = backpacking_info.offset;
 
-            if let Some(player_model_ent) = backpack
-                .attachment_entity
-                .and_then(|ent| possible_attachment_target.get(ent).ok())
+            if let Some(player_model_ent) = attachment_info
+                .and_then(|ent| possible_attachment_target.get(ent.0).ok().map(|(e, _)| e))
             {
                 if let Ok(mut parent_cmds) = commands.get_entity(player_model_ent) {
                     parent_cmds.add_child(ent);

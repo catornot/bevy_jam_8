@@ -1,6 +1,7 @@
 use avian3d::prelude::*;
 use bevy::{
     asset::RenderAssetUsages,
+    ecs::change_detection::Tick,
     gltf::GltfSceneName,
     input::common_conditions::input_just_pressed,
     prelude::*,
@@ -14,10 +15,10 @@ use bevy_enhanced_input::{
 };
 
 use crate::{
-    backpack::{Backpack, PickupItem},
-    bounding_polyhedron::{BoundingPolyhedron, BoundingPolyhedronMarker},
+    backpack::{Backpack, BackpackAttachment, PickupItem},
+    bounding_polyhedron::BoundingPolyhedronMarker,
     camera::{CameraDistance, CameraZoom, CharacterControllerCamera, CharacterControllerCameraOf},
-    pickups::PickupRayCaster,
+    interactable::InteractableRayCaster,
     prelude::*,
 };
 
@@ -54,7 +55,6 @@ pub fn player_plugin(app: &mut App) {
                 capture_cursor.run_if(input_just_pressed(KeyCode::Delete)),
                 release_cursor.run_if(input_just_pressed(KeyCode::Escape)),
                 model_visibility,
-                debug_bounding_polyhedron,
                 rotate_player_model_with_camera,
                 add_model_marker,
             )
@@ -65,12 +65,12 @@ pub fn player_plugin(app: &mut App) {
 }
 
 pub fn spawn_player(
-    mut command: Commands,
+    mut commands: Commands,
     mut assets: ResMut<AssetServer>,
     player_assets: Res<PlayerAssets>,
 ) {
     // spawn player
-    let player = command
+    let player = commands
         .spawn_scene(bsn! {
                 # Player
                 Player
@@ -80,7 +80,7 @@ pub fn spawn_player(
                     climb_pull_up_height: 0.5,
                     standing_view_height: 0.5,
                 }
-                BoundingPolyhedronMarker::new(0.2)
+                BoundingPolyhedronMarker::new(0.2).swizzle()
                 WorldAssetRoot({player_assets.player_scene.clone()})
                 RigidBody::Kinematic
                 Collider::cylinder(0.2, 0.5)
@@ -142,29 +142,58 @@ pub fn spawn_player(
         .id();
 
     // spawn camera
-    let camera = command
+    let camera = commands
         .spawn((
             CameraDistance(0.),
             RayCaster::default().with_direction(Dir3::NEG_Z),
             Camera3d::default(),
-            PickupRayCaster,
+            InteractableRayCaster,
             // Enable the optional builtin camera controller
             CharacterControllerCameraOf::new(player),
         ))
         .id();
 
-    command.spawn_scene(cursor_scene(camera, assets.as_mut()));
+    // spawn audio listener
+    let listener = SpatialListener::new(0.2);
+    commands.spawn((
+        Transform::default(),
+        Visibility::default(),
+        listener.clone(),
+        children![
+            // left ear indicator
+            (Transform::from_translation(listener.left_ear_offset),),
+            // right ear indicator
+            (Transform::from_translation(listener.right_ear_offset),)
+        ],
+        ChildOf(camera),
+    ));
+
+    commands.spawn_scene(cursor_scene(camera, assets.as_mut()));
 }
 
 fn cursor_scene(target_camera: Entity, assets: &mut AssetServer) -> impl Scene {
-    let background = assets.add(Image::new_fill(
-        Extent3d {
-            width: 50,
-            height: 50,
-            depth_or_array_layers: 1,
-        },
+    let size = Extent3d {
+        width: 100,
+        height: 100,
+        depth_or_array_layers: 1,
+    };
+    let background = assets.add(Image::new(
+        size,
         bevy::render::render_resource::TextureDimension::D2,
-        &[0, 0, 0, 255],
+        Vec::from_iter(
+            (0..size.width)
+                .flat_map(|x| (0..size.height).map(move |y| (x as i64, y as i64)))
+                .map(|(x, y)| {
+                    if (x - size.width as i64 / 2).pow(2) + (y - size.height as i64 / 2).pow(2)
+                        <= 45i64.pow(2)
+                    {
+                        255
+                    } else {
+                        0
+                    }
+                })
+                .flat_map(|c| [0, 0, 0, c]),
+        ),
         bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
         RenderAssetUsages::RENDER_WORLD,
     ));
@@ -193,18 +222,25 @@ fn add_pending_model_marker(trigger: On<Add<GltfSceneName>>, mut commands: Comma
 }
 
 fn add_model_marker(
-    children: Query<(&ChildOf, Entity), With<PendingModelMarker>>,
-    mut players: Query<(Entity, &mut Backpack), With<Player>>,
+    children: Query<(&ChildOf, Entity, Ref<PendingModelMarker>)>,
+    players: Query<(), With<Player>>,
     mut commands: Commands,
 ) {
-    for (child_of, ent) in children {
-        let Ok((player_ent, mut backpack)) = players.get_mut(child_of.parent()) else {
-            return;
-        };
+    for (child_of, ent, pending_marker) in children {
+        // wait one frame for stuff to settle
+        if !pending_marker.is_added_after(Tick::new(1)) {
+            continue;
+        }
 
         if let Ok(mut cmds) = commands.get_entity(ent) {
-            cmds.insert(PlayerModel(player_ent));
-            backpack.attachment_entity.replace(ent);
+            if players.get(child_of.parent()).is_ok() {
+                cmds.insert(PlayerModel(child_of.parent()));
+            };
+            cmds.remove::<PendingModelMarker>();
+        }
+
+        if let Ok(mut cmds) = commands.get_entity(child_of.parent()) {
+            cmds.insert(BackpackAttachment::new(ent));
         }
     }
 }
@@ -233,26 +269,6 @@ fn model_visibility(
             if let Ok(mut vis) = all_children.get_mut(child) {
                 *vis = new_vis
             }
-        }
-    }
-}
-
-fn debug_bounding_polyhedron(
-    bounding_polyhedrons: Query<(&Transform, &BoundingPolyhedron)>,
-    mut gizmos: Gizmos,
-) {
-    for (transform, bounding_polyhedron) in bounding_polyhedrons {
-        let points = bounding_polyhedron.get().points();
-
-        for edge in bounding_polyhedron.get().edges() {
-            let a = points[edge.vertices[0] as usize];
-            let b = points[edge.vertices[1] as usize];
-
-            gizmos.line(
-                transform.translation + a,
-                transform.translation + b,
-                Color::srgb(1., 0., 0.),
-            );
         }
     }
 }

@@ -39,6 +39,7 @@
               packages.dioxus-cli.develop
               packages.bevy-cli.develop
               pkgs.inotify-tools
+              pkgs.wgsl-analyzer
             ];
           };
         };

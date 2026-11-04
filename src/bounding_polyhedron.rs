@@ -3,7 +3,11 @@ use bevy::{mesh::VertexAttributeValues, prelude::*};
 
 pub fn bounding_polyhedron_plugin(app: &mut App) {
     app.register_type::<BoundingPolyhedronMarker>()
-        .add_systems(Update, calculate_bounding_polyhedron);
+        .register_type::<BoundingPolyhedronSkipMarker>()
+        .add_systems(
+            Update,
+            (calculate_bounding_polyhedron, debug_bounding_polyhedron),
+        );
 }
 
 /// the bounding polyhedron for the model of an entity, used for by the backpack system
@@ -18,17 +22,23 @@ impl BoundingPolyhedron {
 
 /// the f32 is the scale
 #[derive(Component, Clone, Reflect)]
-pub struct BoundingPolyhedronMarker(f32);
+pub struct BoundingPolyhedronMarker(f32, bool);
+
+#[derive(Component, Default, Clone, Reflect)]
+pub struct BoundingPolyhedronSkipMarker;
 
 impl Default for BoundingPolyhedronMarker {
     fn default() -> Self {
-        Self(1.)
+        Self(1., false)
     }
 }
 
 impl BoundingPolyhedronMarker {
     pub fn new(scale: f32) -> Self {
-        Self(scale.max(0.))
+        Self(scale.max(0.), false)
+    }
+    pub fn swizzle(self) -> Self {
+        Self(self.0, true)
     }
 }
 
@@ -36,10 +46,10 @@ fn calculate_bounding_polyhedron(
     mut commands: Commands,
     roots: Query<(Entity, &BoundingPolyhedronMarker), Without<BoundingPolyhedron>>,
     children: Query<&Children>,
-    meshes: Query<&Mesh3d>,
+    meshes: Query<&Mesh3d, Without<BoundingPolyhedronSkipMarker>>,
     assets: Res<Assets<Mesh>>,
 ) {
-    for (root, &BoundingPolyhedronMarker(scale)) in roots {
+    for (root, &BoundingPolyhedronMarker(scale, swizzle)) in roots {
         let mut queue = vec![root];
         let mut vertices = Vec::new();
 
@@ -64,7 +74,13 @@ fn calculate_bounding_polyhedron(
                 else {
                     continue;
                 };
-                vertices.extend(values.iter().copied().map(Vec3::from).map(|v| v.xzy()));
+                vertices.extend(
+                    values
+                        .iter()
+                        .copied()
+                        .map(Vec3::from)
+                        .map(|v| if swizzle { v.xzy() } else { v }),
+                );
             }
         }
 
@@ -76,6 +92,27 @@ fn calculate_bounding_polyhedron(
                 continue;
             };
             root_cmds.insert(BoundingPolyhedron(convex_polyhedron));
+        }
+    }
+}
+
+fn debug_bounding_polyhedron(
+    bounding_polyhedrons: Query<(&Transform, &BoundingPolyhedron)>,
+    mut gizmos: Gizmos,
+) {
+    for (transform, bounding_polyhedron) in bounding_polyhedrons {
+        let points = bounding_polyhedron.get().points();
+
+        for edge in bounding_polyhedron.get().edges() {
+            let a = points[edge.vertices[0] as usize];
+            let b = points[edge.vertices[1] as usize];
+
+            let transform = transform.with_scale(Vec3::splat(1.));
+            gizmos.line(
+                transform.transform_point(a),
+                transform.transform_point(b),
+                Color::srgb(1., 0., 0.),
+            );
         }
     }
 }

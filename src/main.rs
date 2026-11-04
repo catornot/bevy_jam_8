@@ -12,11 +12,12 @@ mod bounding_polyhedron;
 mod camera;
 mod cauldron;
 mod default_scene;
+mod fox;
+mod interactable;
 mod pickups;
 mod player;
 mod prelude;
 mod rand;
-mod fox;
 
 #[allow(unused)]
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
@@ -49,6 +50,7 @@ fn main() {
             bounding_polyhedron::bounding_polyhedron_plugin,
             backpack::backpack_plugin,
             fox::fox_plugin,
+            interactable::interactable_plugin,
         ))
         .add_loading_state(
             LoadingState::new(GlobalStates::AssetLoading)
@@ -56,7 +58,8 @@ fn main() {
                 .load_collection::<player::PlayerAssets>()
                 .load_collection::<default_scene::Cubemap>()
                 .load_collection::<pickups::berries::BerryAssets>()
-                .load_collection::<fox::FoxAssets>(),
+                .load_collection::<fox::FoxAssets>()
+                .load_collection::<cauldron::CauldronAssets>(),
         )
         .init_state::<GlobalStates>()
         .run();
