@@ -18,7 +18,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
 
   cargoHash = "sha256-32WIEMmtsR5g7kpcSosDfQtKcAz+4g3ZlYQLvqdpNlc=";
 
-  doCheck = false;  
+  doCheck = false;
   checkFlags = [
     # Imports failures
     "--skip=base-db"
