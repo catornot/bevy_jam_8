@@ -1,8 +1,8 @@
-use avian3d::{collision::collider::Collider, dynamics::rigid_body::*};
+use avian3d::{collision::collider::*, dynamics::rigid_body::*};
 use bevy::{math::FloatPow, prelude::*};
 use bevy_asset_loader::asset_collection::AssetCollection;
 
-use crate::{GlobalStates, player::Player};
+use crate::{GameLayer, GlobalStates, player::Player};
 
 pub fn fox_plugin(app: &mut App) {
     app.insert_resource(FoxResource {
@@ -26,6 +26,7 @@ pub struct FoxResource {
 }
 
 #[derive(Component, Default, Clone, Reflect)]
+#[require(CollisionLayers::new(GameLayer::Enemy, LayerMask::ALL))]
 pub struct Fox;
 
 #[derive(Component, Default, Clone, Reflect)]

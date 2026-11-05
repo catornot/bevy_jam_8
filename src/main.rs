@@ -34,7 +34,7 @@ enum GameLayer {
     #[default]
     Default,
     Player,
-    // Enemy,
+    Enemy,
     Ground,
     Cauldron,
     Pickups,
