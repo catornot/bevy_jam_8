@@ -1,4 +1,5 @@
-use bevy::{math::FloatPow, prelude::*};
+use avian3d::{collision::collider::Collider, dynamics::rigid_body::*};
+use bevy::prelude::*;
 use bevy_asset_loader::asset_collection::AssetCollection;
 
 use crate::{GlobalStates, player::Player};
@@ -7,7 +8,7 @@ pub fn fox_plugin(app: &mut App) {
     app.register_type::<Fox>()
         .insert_resource(FoxResource {
             max_attack_distance: 1.,
-            speed: 1.,
+            speed: 3.,
         })
         .add_systems(OnEnter(GlobalStates::Game), spawn_fox)
         .add_systems(Update, hunt_player);
@@ -32,8 +33,18 @@ pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
     command.spawn_scene(bsn! {
             #Fox
             Fox
-            WorldAssetRoot({fox_assets.fox_scene.clone()})
-            Transform::from_xyz(0.0, 2.0, 0.0).with_scale(Vec3::splat(0.05))
+            Children [
+                WorldAssetRoot({fox_assets.fox_scene.clone()})
+                Transform::from_scale(Vec3::splat(0.05)).with_rotation(Quat::from_rotation_y(Rot2::degrees(180.).as_radians()))
+            ]
+            RigidBody::Dynamic
+            Children [
+                Collider::cylinder(0.75, 0.5)
+                Transform::from_xyz(0., 0.5, 0.)
+            ]
+            LockedAxes::new().lock_rotation_x().lock_rotation_z()
+            LinearVelocity::ZERO
+            Transform::from_xyz(10.0, 100.0, 0.0)
     });
 }
 
@@ -49,9 +60,16 @@ pub fn hunt_player(
             fox_transform.translation +=
                 displacement.normalize() * fox_resource.speed * time.delta_secs();
 
-            if displacement.length_squared() < fox_resource.max_attack_distance.squared() {
-                print!("Dead!")
-            }
+            fox_transform.rotation = fox_transform
+                .looking_at(
+                    Vec3::new(
+                        player_transform.translation.x,
+                        fox_transform.translation.y, // avoid pitch/roll by assuming same height
+                        player_transform.translation.z,
+                    ),
+                    fox_transform.up(),
+                )
+                .rotation
         }
     }
 }
