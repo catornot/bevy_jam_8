@@ -35,14 +35,16 @@ pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
             Fox
             Children [
                 WorldAssetRoot({fox_assets.fox_scene.clone()})
-                Transform::from_scale(Vec3::splat(0.05)).with_rotation(Quat::from_rotation_y(Rot2::degrees(180.).as_radians()))
+                Transform::from_scale(Vec3::splat(0.05))
+                // the fox model is backwards
+                .with_rotation(Quat::from_rotation_y(Rot2::degrees(180.).as_radians()))
             ]
             RigidBody::Dynamic
             Children [
                 Collider::cylinder(0.75, 0.5)
-                Transform::from_xyz(0., 0.5, 0.)
+                Transform::from_xyz(0., 0.5, 0.) // shift collider by its height
             ]
-            LockedAxes::new().lock_rotation_x().lock_rotation_z()
+            LockedAxes::new().lock_rotation_x().lock_rotation_z() // only allow rotation around y axis
             LinearVelocity::ZERO
             Transform::from_xyz(10.0, 100.0, 0.0)
     });
