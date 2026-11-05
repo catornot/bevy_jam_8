@@ -1,17 +1,16 @@
 use avian3d::{collision::collider::Collider, dynamics::rigid_body::*};
-use bevy::prelude::*;
+use bevy::{math::FloatPow, prelude::*};
 use bevy_asset_loader::asset_collection::AssetCollection;
 
 use crate::{GlobalStates, player::Player};
 
 pub fn fox_plugin(app: &mut App) {
-    app.register_type::<Fox>()
-        .insert_resource(FoxResource {
-            max_attack_distance: 1.,
-            speed: 3.,
-        })
-        .add_systems(OnEnter(GlobalStates::Game), spawn_fox)
-        .add_systems(Update, hunt_player);
+    app.insert_resource(FoxResource {
+        max_attack_distance: 1.,
+        speed: 3.,
+    })
+    .add_systems(OnEnter(GlobalStates::Game), spawn_fox)
+    .add_systems(Update, hunt_player);
 }
 
 #[derive(AssetCollection, Resource)]
@@ -28,6 +27,9 @@ pub struct FoxResource {
 
 #[derive(Component, Default, Clone, Reflect)]
 pub struct Fox;
+
+#[derive(Component, Default, Clone, Reflect)]
+pub struct PreAttack(bool);
 
 pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
     command.spawn_scene(bsn! {
@@ -47,18 +49,23 @@ pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
             LockedAxes::new().lock_rotation_x().lock_rotation_z() // only allow rotation around y axis
             LinearVelocity::ZERO
             Transform::from_xyz(10.0, 100.0, 0.0)
+            PreAttack(false)
     });
 }
 
 pub fn hunt_player(
-    foxes: Query<&mut Transform, With<Fox>>,
+    foxes: Query<(&mut Transform, &mut PreAttack), With<Fox>>,
     players: Query<&Transform, (With<Player>, Without<Fox>)>,
     fox_resource: Res<FoxResource>,
     time: Res<Time>,
 ) {
-    for mut fox_transform in foxes {
+    for (mut fox_transform, mut pre_attack) in foxes {
         for player_transform in players {
             let displacement = player_transform.translation - fox_transform.translation;
+
+            pre_attack.0 =
+                displacement.length_squared() < fox_resource.max_attack_distance.squared();
+
             fox_transform.translation +=
                 displacement.normalize() * fox_resource.speed * time.delta_secs();
 
