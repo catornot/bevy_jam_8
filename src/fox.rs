@@ -29,7 +29,9 @@ pub struct FoxResource {
 pub struct Fox;
 
 #[derive(Component, Default, Clone, Reflect)]
-pub struct PreAttack(bool);
+pub struct Hostile {
+    pre_attack: bool,
+}
 
 pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
     command.spawn_scene(bsn! {
@@ -50,21 +52,21 @@ pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
             LockedAxes::new().lock_rotation_x().lock_rotation_z() // only allow rotation around y axis
             LinearVelocity::ZERO
             Transform::from_xyz(10.0, 100.0, 0.0)
-            PreAttack(false)
+            Hostile { pre_attack: false }
     });
 }
 
 pub fn hunt_player(
-    foxes: Query<(&mut Transform, &mut LinearVelocity, &mut PreAttack), With<Fox>>,
+    foxes: Query<(&mut Transform, &mut LinearVelocity, &mut Hostile), With<Fox>>,
     players: Query<&Transform, (With<Player>, Without<Fox>)>,
     fox_resource: Res<FoxResource>,
     time: Res<Time>,
 ) {
-    for (mut fox_transform, mut fox_velocity, mut pre_attack) in foxes {
+    for (mut fox_transform, mut fox_velocity, mut hostile) in foxes {
         for player_transform in players {
             let displacement = player_transform.translation - fox_transform.translation;
 
-            pre_attack.0 =
+            hostile.pre_attack =
                 displacement.length_squared() < fox_resource.max_attack_distance.squared();
 
             fox_velocity.0 = fox_velocity
