@@ -35,6 +35,7 @@ pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
     command.spawn_scene(bsn! {
             #Fox
             Fox
+            Visibility
             Children [
                 WorldAssetRoot({fox_assets.fox_scene.clone()})
                 Transform::from_scale(Vec3::splat(0.05))
@@ -54,20 +55,21 @@ pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
 }
 
 pub fn hunt_player(
-    foxes: Query<(&mut Transform, &mut PreAttack), With<Fox>>,
+    foxes: Query<(&mut Transform, &mut LinearVelocity, &mut PreAttack), With<Fox>>,
     players: Query<&Transform, (With<Player>, Without<Fox>)>,
     fox_resource: Res<FoxResource>,
     time: Res<Time>,
 ) {
-    for (mut fox_transform, mut pre_attack) in foxes {
+    for (mut fox_transform, mut fox_velocity, mut pre_attack) in foxes {
         for player_transform in players {
             let displacement = player_transform.translation - fox_transform.translation;
 
             pre_attack.0 =
                 displacement.length_squared() < fox_resource.max_attack_distance.squared();
 
-            fox_transform.translation +=
-                displacement.normalize() * fox_resource.speed * time.delta_secs();
+            fox_velocity.0 = fox_velocity
+                .0
+                .with_xz((displacement.normalize() * fox_resource.speed).xz());
 
             fox_transform.rotation = fox_transform
                 .looking_at(
