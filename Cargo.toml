@@ -23,11 +23,9 @@ features = []
 [profile.dev.package."*"]
 opt-level = 3
 
-[profile.web-dev.package]
+[profile.web-dev]
 debug = false
-
-[profile.web-dev.package."*"]
-opt-level = 3
+inherits = "dev"
 
 [profile.web-release]
 inherits = "release"
