@@ -6,11 +6,16 @@ use crate::{GameLayer, GlobalStates, player::Player};
 
 pub fn fox_plugin(app: &mut App) {
     app.insert_resource(FoxResource {
-        max_attack_distance: 1.,
-        speed: 3.,
+        max_attack_distance: 2.,
+        run_speed: 3.,
+        attack_time: 1.,
+        cooldown_time: 1.,
     })
     .add_systems(OnEnter(GlobalStates::Game), spawn_fox)
-    .add_systems(Update, hunt_player);
+    .add_systems(
+        Update,
+        (chasing_player, attacking_player, hostile_cooling_down),
+    );
 }
 
 #[derive(AssetCollection, Resource)]
@@ -21,17 +26,31 @@ pub struct FoxAssets {
 
 #[derive(Resource)]
 pub struct FoxResource {
+    run_speed: f32,
     max_attack_distance: f32,
-    speed: f32,
+    attack_time: f32,
+    cooldown_time: f32,
 }
 
 #[derive(Component, Default, Clone, Reflect)]
 #[require(CollisionLayers::new(GameLayer::Enemy, LayerMask::ALL))]
 pub struct Fox;
 
-#[derive(Component, Default, Clone, Reflect)]
-pub struct Hostile {
-    pre_attack: bool,
+pub mod hostile_state {
+    use bevy::{ecs::component::Component, reflect::Reflect};
+
+    #[derive(Component, Default, Clone, Reflect)]
+    pub struct Chasing;
+
+    #[derive(Component, Default, Clone, Reflect)]
+    pub struct Attacking {
+        pub time: f32,
+    }
+
+    #[derive(Component, Default, Clone, Reflect)]
+    pub struct Cooldown {
+        pub time: f32,
+    }
 }
 
 pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
@@ -53,26 +72,32 @@ pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
             LockedAxes::new().lock_rotation_x().lock_rotation_z() // only allow rotation around y axis
             LinearVelocity::ZERO
             Transform::from_xyz(10.0, 100.0, 0.0)
-            Hostile { pre_attack: false }
+            hostile_state::Chasing
     });
 }
 
-pub fn hunt_player(
-    foxes: Query<(&mut Transform, &mut LinearVelocity, &mut Hostile), With<Fox>>,
-    players: Query<&Transform, (With<Player>, Without<Fox>)>,
+pub fn chasing_player(
+    mut commands: Commands,
+    hostiles: Query<
+        (
+            &mut Transform,
+            &mut LinearVelocity,
+            Entity,
+            Option<&hostile_state::Cooldown>,
+            Option<&hostile_state::Attacking>,
+        ),
+        (Without<Player>, With<hostile_state::Chasing>),
+    >,
+    players: Query<&Transform, With<Player>>,
     fox_resource: Res<FoxResource>,
-    time: Res<Time>,
 ) {
-    for (mut fox_transform, mut fox_velocity, mut hostile) in foxes {
+    for (mut fox_transform, mut fox_velocity, fox_entity, fox_cooldown, fox_attacking) in hostiles {
         for player_transform in players {
             let displacement = player_transform.translation - fox_transform.translation;
 
-            hostile.pre_attack =
-                displacement.length_squared() < fox_resource.max_attack_distance.squared();
-
             fox_velocity.0 = fox_velocity
                 .0
-                .with_xz((displacement.normalize() * fox_resource.speed).xz());
+                .with_xz((displacement.normalize() * fox_resource.run_speed).xz());
 
             fox_transform.rotation = fox_transform
                 .looking_at(
@@ -83,7 +108,52 @@ pub fn hunt_player(
                     ),
                     fox_transform.up(),
                 )
-                .rotation
+                .rotation;
+
+            if displacement.length_squared() < fox_resource.max_attack_distance.squared()
+                && fox_cooldown.is_none()
+                && fox_attacking.is_none()
+            {
+                commands
+                    .entity(fox_entity)
+                    .insert(hostile_state::Attacking { time: 0. });
+                println!("About to attack!");
+            }
+        }
+    }
+}
+
+pub fn attacking_player(
+    mut commands: Commands,
+    hostiles: Query<(Entity, &mut hostile_state::Attacking), Without<Player>>,
+    fox_resource: Res<FoxResource>,
+    time: Res<Time>,
+) {
+    for (fox_entity, mut attacking) in hostiles {
+        attacking.time += time.delta_secs();
+        if attacking.time > fox_resource.attack_time {
+            println!("Chomp!");
+            commands
+                .entity(fox_entity)
+                .remove::<hostile_state::Attacking>()
+                .insert(hostile_state::Cooldown { time: 0. });
+        }
+    }
+}
+
+pub fn hostile_cooling_down(
+    mut commands: Commands,
+    hostiles: Query<(Entity, &mut hostile_state::Cooldown), Without<Player>>,
+    fox_resource: Res<FoxResource>,
+    time: Res<Time>,
+) {
+    for (fox_entity, mut cooldown) in hostiles {
+        cooldown.time += time.delta_secs();
+        if cooldown.time > fox_resource.cooldown_time {
+            commands
+                .entity(fox_entity)
+                .remove::<hostile_state::Cooldown>();
+            println!("Cooldown over!");
         }
     }
 }
