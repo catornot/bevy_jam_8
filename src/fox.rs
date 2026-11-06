@@ -12,10 +12,7 @@ pub fn fox_plugin(app: &mut App) {
         cooldown_time: 1.,
     })
     .add_systems(OnEnter(GlobalStates::Game), spawn_fox)
-    .add_systems(
-        Update,
-        (chasing_player, attacking_player, hostile_cooling_down),
-    );
+    .add_systems(Update, (chasing_player, attacking_player, cooling_down));
 }
 
 #[derive(AssetCollection, Resource)]
@@ -25,7 +22,7 @@ pub struct FoxAssets {
 }
 
 #[derive(Resource)]
-pub struct FoxResource {
+struct FoxResource {
     run_speed: f32,
     max_attack_distance: f32,
     attack_time: f32,
@@ -53,7 +50,7 @@ pub mod hostile_state {
     }
 }
 
-pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
+fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
     command.spawn_scene(bsn! {
             #Fox
             Fox
@@ -76,7 +73,7 @@ pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
     });
 }
 
-pub fn chasing_player(
+fn chasing_player(
     mut commands: Commands,
     hostiles: Query<
         (
@@ -123,7 +120,7 @@ pub fn chasing_player(
     }
 }
 
-pub fn attacking_player(
+fn attacking_player(
     mut commands: Commands,
     hostiles: Query<(Entity, &mut hostile_state::Attacking), Without<Player>>,
     fox_resource: Res<FoxResource>,
@@ -141,7 +138,7 @@ pub fn attacking_player(
     }
 }
 
-pub fn hostile_cooling_down(
+fn cooling_down(
     mut commands: Commands,
     hostiles: Query<(Entity, &mut hostile_state::Cooldown), Without<Player>>,
     fox_resource: Res<FoxResource>,
