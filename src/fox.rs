@@ -2,7 +2,7 @@ use avian3d::{collision::collider::*, dynamics::rigid_body::*};
 use bevy::{math::FloatPow, prelude::*};
 use bevy_asset_loader::asset_collection::AssetCollection;
 
-use crate::{GameLayer, GlobalStates, player::Player};
+use crate::{GameLayer, player::Player};
 
 pub fn fox_plugin(app: &mut App) {
     app.insert_resource(FoxResource {
@@ -11,7 +11,6 @@ pub fn fox_plugin(app: &mut App) {
         attack_time: 1.,
         cooldown_time: 1.,
     })
-    .add_systems(OnEnter(GlobalStates::Game), spawn_fox)
     .add_systems(Update, (chasing_player, attacking_player, cooling_down));
 }
 
@@ -50,7 +49,7 @@ pub mod hostile_state {
     }
 }
 
-fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
+pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
     command.spawn_scene(bsn! {
             #Fox
             Fox

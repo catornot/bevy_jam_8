@@ -7,7 +7,7 @@ use bevy::{
     render::render_resource::{TextureViewDescriptor, TextureViewDimension},
 };
 
-use crate::prelude::*;
+use crate::{fox, prelude::*};
 
 pub fn default_scene_plugin(app: &mut App) {
     app.insert_resource(GlobalAmbientLight {
@@ -15,7 +15,7 @@ pub fn default_scene_plugin(app: &mut App) {
         brightness: 1.0,
         ..default()
     })
-    .add_systems(OnEnter(GlobalStates::Game), scene)
+    .add_systems(OnEnter(GlobalStates::Game), (scene, fox::spawn_fox).chain())
     .add_observer(add_skybox_to_camera);
 }
 
