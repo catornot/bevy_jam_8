@@ -1,5 +1,5 @@
 use avian3d::{collision::collider::*, dynamics::rigid_body::*};
-use bevy::{math::FloatPow, prelude::*};
+use bevy::{asset::AssetMut, gltf::GltfMaterialName, math::FloatPow, prelude::*};
 use bevy_asset_loader::asset_collection::AssetCollection;
 
 use crate::{GameLayer, player::Player};
@@ -119,16 +119,60 @@ fn chasing_player(
     }
 }
 
+fn material_edit(
+    children: Query<&Children>,
+    entity: Entity,
+    mesh_materials: Query<(&MeshMaterial3d<StandardMaterial>, Option<&GltfMaterialName>)>,
+    standard_materials: &mut ResMut<Assets<StandardMaterial>>,
+    f: fn(&GltfMaterialName, AssetMut<'_, StandardMaterial>) -> (),
+) {
+    for descendant in children.iter_descendants(entity) {
+        let Ok((material_handle, name_component)) = mesh_materials.get(descendant) else {
+            continue;
+        };
+
+        if let Some(material) = standard_materials.get_mut(material_handle.id())
+            && let Some(mat_name) = name_component
+        {
+            f(mat_name, material);
+        }
+    }
+}
+
 fn attacking_player(
     mut commands: Commands,
-    hostiles: Query<(Entity, &mut hostile_state::Attacking), Without<Player>>,
+    hostiles: Query<(Entity, Mut<hostile_state::Attacking>), Without<Player>>,
     fox_resource: Res<FoxResource>,
     time: Res<Time>,
+    children: Query<&Children>,
+    mesh_materials: Query<(&MeshMaterial3d<StandardMaterial>, Option<&GltfMaterialName>)>,
+    mut standard_materials: ResMut<Assets<StandardMaterial>>,
 ) {
     for (fox_entity, mut attacking) in hostiles {
         attacking.time += time.delta_secs();
+        if attacking.is_added() {
+            material_edit(
+                children,
+                fox_entity,
+                mesh_materials,
+                &mut standard_materials,
+                |_name, mut material| {
+                    material.base_color = Srgba::rgb(1.0, 0.5, 0.5).into();
+                },
+            )
+        }
         if attacking.time > fox_resource.attack_time {
             println!("Chomp!");
+            material_edit(
+                children,
+                fox_entity,
+                mesh_materials,
+                &mut standard_materials,
+                |_name, mut material| {
+                    material.base_color = Color::WHITE;
+                },
+            );
+
             commands
                 .entity(fox_entity)
                 .remove::<hostile_state::Attacking>()
