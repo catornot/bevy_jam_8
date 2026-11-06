@@ -1,20 +1,10 @@
-use std::{
-    ops::{Deref, DerefMut},
-    time::{SystemTime, UNIX_EPOCH},
-};
-
 use bevy::prelude::*;
-use rand::{Rng, SeedableRng, rngs::Xoshiro128PlusPlus};
+use rand::rngs::Xoshiro128PlusPlus;
+use std::ops::{Deref, DerefMut};
 
 pub fn rand_plugin(app: &mut App) {
     app.insert_resource(Rand {
-        algo: Xoshiro128PlusPlus::from_seed(
-            (SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs() as u128)
-                .to_ne_bytes(),
-        ),
+        algo: rand::make_rng(),
     })
     .add_systems(Update, seed_randomizer);
 }
@@ -38,9 +28,8 @@ impl DerefMut for Rand {
     }
 }
 
-fn seed_randomizer(mut rand: ResMut<Rand>, keys_pressed: Res<ButtonInput<KeyCode>>) {
-    _ = rand.algo.next_u32();
-    keys_pressed
-        .get_pressed()
-        .for_each(|_| _ = rand.algo.next_u64());
+fn seed_randomizer(mut rand: ResMut<Rand>) {
+    if rand.is_changed() {
+        rand.bypass_change_detection().algo = rand::make_rng();
+    }
 }
