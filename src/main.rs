@@ -6,6 +6,7 @@ use bevy_ahoy::AhoyPlugins;
 use bevy_asset_loader::prelude::*;
 use bevy_enhanced_input::EnhancedInputPlugin;
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
+use bevy_mod_outline::OutlinePlugin;
 
 mod backpack;
 mod bounding_polyhedron;
@@ -52,6 +53,7 @@ fn main() {
             EguiPlugin::default(),
             WorldInspectorPlugin::new(),
             FrameTimeDiagnosticsPlugin::default(),
+            OutlinePlugin::JUMP_FLOOD,
         ))
         .add_plugins((
             player::player_plugin,

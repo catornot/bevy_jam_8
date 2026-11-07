@@ -1,6 +1,10 @@
 use avian3d::{parry::utils::hashset::HashSet, prelude::*};
-use bevy::prelude::*;
+use bevy::{
+    ecs::{lifecycle::HookContext, world::DeferredWorld},
+    prelude::*,
+};
 use bevy_enhanced_input::prelude::*;
+use bevy_mod_outline::{OutlineVolume, PropagateOutline};
 
 use crate::prelude::*;
 
@@ -14,7 +18,7 @@ pub fn interactable_plugin(app: &mut App) {
         .register_type::<Interacted>()
         .add_systems(
             Update,
-            (set_selected_intractable_s, highlight_selected).run_if(in_state(GlobalStates::Game)),
+            set_selected_intractable_s.run_if(in_state(GlobalStates::Game)),
         );
 }
 
@@ -22,10 +26,39 @@ pub fn interactable_plugin(app: &mut App) {
 pub struct InteractableRayCaster;
 
 #[derive(Component, Clone, Copy, Default, Reflect)]
+#[require(OutlineVolume { visible: false, width: 0.5, colour: Color::srgb(0.0, 1.0, 0.0) }, PropagateOutline)]
 pub struct Interactable;
 
 #[derive(Component, Clone, Copy, Default, Reflect)]
+#[component(on_add = Self::on_add)]
+#[component(on_remove = Self::on_remove)]
 pub struct Selected;
+
+impl Selected {
+    fn on_add(mut world: DeferredWorld<'_>, ctx: HookContext) {
+        let mut commands = world.commands();
+        let Ok(mut ent_cmds) = commands.get_entity(ctx.entity) else {
+            return;
+        };
+        ent_cmds.insert(OutlineVolume {
+            visible: true,
+            width: 5.,
+            colour: Color::srgb(0.0, 1.0, 0.1),
+        });
+    }
+
+    fn on_remove(mut world: DeferredWorld<'_>, ctx: HookContext) {
+        let mut commands = world.commands();
+        let Ok(mut ent_cmds) = commands.get_entity(ctx.entity) else {
+            return;
+        };
+        ent_cmds.insert(OutlineVolume {
+            visible: false,
+            width: 5.,
+            colour: Color::srgb(0.0, 1.0, 0.0),
+        });
+    }
+}
 
 #[derive(Event, Clone, Copy, Default, Reflect)]
 pub struct Interacted;
@@ -33,19 +66,6 @@ pub struct Interacted;
 #[derive(Debug, InputAction, Reflect)]
 #[action_output(bool)]
 pub struct UseAction;
-
-pub fn highlight_selected(pickups: Query<&Transform, With<Selected>>, mut gizmos: Gizmos) {
-    for transform in pickups {
-        gizmos
-            .rounded_cuboid(
-                Isometry3d::from_translation(transform.translation),
-                Vec3::splat(2.),
-                bevy::color::palettes::css::GREEN,
-            )
-            .edge_radius(0.25)
-            .arc_resolution(10);
-    }
-}
 
 pub fn set_selected_intractable_s(
     mut commands: Commands,
