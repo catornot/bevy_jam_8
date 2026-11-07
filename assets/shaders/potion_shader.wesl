@@ -32,28 +32,13 @@ var<uniform> material: PotionMaterial;
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let speed = 2.0;
-    // The globals binding contains various global values like time
-    // which is the time since startup in seconds
-    // let t_1 = sin(globals.time * speed);
-    // let t_2 = cos(globals.time * speed);
-    let t_1 = 1.;
-    let t_2 = 2.;
-
-    // let distance_to_center = distance(in.uv, vec3<f32>(0.5)) * 1.4;
-
-    // blending is done in a perceptual color space: https://bottosson.github.io/posts/oklab/
-    // let red = vec3<f32>(0.627955, 0.224863, 0.125846);
-    // let green = vec3<f32>(0.86644, -0.233887, 0.179498);
-    // let blue = vec3<f32>(0.701674, 0.274566, -0.169156);
-    // let white = vec3<f32>(1.0, 0.0, 0.0);
-    // let mixed = mix(mix(red, blue, t_1), mix(green, white, t_2), distance_to_center);
 
     var color = material.color.xyz;
     for(var i = 0; i < 8; i++) {
         if material.uv_space_positions[i].x >= 0. && material.uv_space_positions[i].y >= 0. {
             let dist = distance(in.uv, material.uv_space_positions[i].xy)
                 / max(material.uv_space_positions[i].z, 1.0);
-            color = vec3<f32>(color.x, color.y * clamp(dist * 2., 0., 1.), color.z);
+            color = vec3<f32>(color.x, mix(color.y, color.z, dist), mix(color.z, color.y, dist));
             break;
         }
     }

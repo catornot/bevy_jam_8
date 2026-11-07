@@ -31,7 +31,7 @@ pub fn cauldron_plugin(app: &mut App) {
 
 #[derive(Component, Clone, FromTemplate, Reflect)]
 #[require(CollisionLayers::new(GameLayer::Cauldron, LayerMask::ALL))]
-pub struct Cauldron(Hsva);
+pub struct Cauldron(Laba);
 
 #[derive(Component, Clone, FromTemplate, Reflect)]
 pub struct CauldronDrops(Vec3);
@@ -107,7 +107,9 @@ fn sync_material(
 
         if let Some(mut material) = materials.get_mut(material_handle.id()) {
             let color: Oklaba = cauldron.0.into();
-            material.color = color.to_vec4();
+            material
+                .color
+                .smooth_nudge(&color.to_vec4(), 10f32.ln(), 0.01);
 
             let mut max = 0;
             for (i, &CauldronDrops(offset)) in children
@@ -118,8 +120,7 @@ fn sync_material(
                 .enumerate()
             {
                 if let Some(slot) = material.positions.get_mut(i) {
-                    *slot = (offset + Vec2::splat(0.5).extend(0.)) / Vec2::splat(0.9).extend(1.);
-                    log::info!("{offset:?} => {:?}", *slot);
+                    *slot = (offset + Vec2::splat(0.5).extend(0.)) / Vec2::splat(0.9).extend(5.);
                 }
                 max = i + 1;
             }
@@ -219,14 +220,15 @@ fn consume_items(
             .id();
         commands.entity(sensor.parent()).add_child(timer);
 
-        // cauldron.0.saturation = (cauldron.0.saturation + pickup.1.0.x).rem_euclid(1.);
-        // cauldron.0.hue = (cauldron.0.hue + pickup.1.0.y).rem_euclid(1.);
-        // cauldron.0.value = (cauldron.0.value + pickup.1.0.z).rem_euclid(1.);
+        cauldron.0.lightness =
+            (cauldron.0.lightness.algebraic_sub(0.3) + pickup.1.0.x).rem_euclid(0.7) + 0.3;
+        cauldron.0.a = (cauldron.0.a.algebraic_sub(0.2) + pickup.1.0.y).rem_euclid(0.8) + 0.2;
+        cauldron.0.b = (cauldron.0.b.algebraic_sub(0.2) + pickup.1.0.z).rem_euclid(0.8) + 0.2;
     }
 }
 
 fn on_drop_timeout(event: On<TimerTimeout>, mut commands: Commands) {
-    // commands.entity(event.event().0).despawn();
+    commands.entity(event.event().0).despawn();
 }
 
 #[derive(Debug, Asset, Default, TypePath, AsBindGroup, Clone)]
