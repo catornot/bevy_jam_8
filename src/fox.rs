@@ -124,7 +124,7 @@ fn material_edit(
     entity: Entity,
     mesh_materials: Query<(&MeshMaterial3d<StandardMaterial>, Option<&GltfMaterialName>)>,
     standard_materials: &mut ResMut<Assets<StandardMaterial>>,
-    f: fn(&GltfMaterialName, AssetMut<'_, StandardMaterial>) -> (),
+    f: impl Fn(&GltfMaterialName, AssetMut<'_, StandardMaterial>),
 ) {
     for descendant in children.iter_descendants(entity) {
         let Ok((material_handle, name_component)) = mesh_materials.get(descendant) else {
