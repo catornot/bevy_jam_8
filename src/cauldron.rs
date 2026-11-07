@@ -1,7 +1,7 @@
 use avian3d::prelude::*;
 use bevy::{
-    ecs::relationship::Relationship, prelude::*, reflect::TypePath,
-    render::render_resource::AsBindGroup, shader::ShaderRef,
+    asset::io::embedded::GetAssetServer, ecs::relationship::Relationship, prelude::*,
+    reflect::TypePath, render::render_resource::AsBindGroup, shader::ShaderRef,
 };
 use bevy_enhanced_input::prelude::*;
 use std::f32::consts::FRAC_PI_2;
@@ -18,15 +18,22 @@ use crate::{
 const SHADER_ASSET_PATH: &str = "shaders/potion_shader.wesl";
 
 pub fn cauldron_plugin(app: &mut App) {
-    app.register_type::<Cauldron>()
-        .register_type::<CauldronDrops>()
-        .register_type::<CauldronTrigger>()
-        .register_type::<CauldronEffect>()
-        .add_plugins(MaterialPlugin::<PotionMaterial>::default())
-        .add_systems(OnEnter(GlobalStates::Game), spawn_cauldron)
-        .add_systems(Update, (sync_material, drop_items, consume_items))
-        .add_observer(deposit_in_cauldron)
-        .add_observer(on_drop_timeout);
+    app.insert_resource(BubbleMesh {
+        bubble: app.get_asset_server().add(Sphere::new(10.).mesh().build()),
+    })
+    .register_type::<Cauldron>()
+    .register_type::<CauldronDrop>()
+    .register_type::<CauldronTrigger>()
+    .register_type::<CauldronEffect>()
+    .register_type::<Bubble>()
+    .add_plugins(MaterialPlugin::<PotionMaterial>::default())
+    .add_systems(OnEnter(GlobalStates::Game), spawn_cauldron)
+    .add_systems(
+        Update,
+        (sync_material, drop_items, consume_items, move_bubble),
+    )
+    .add_observer(deposit_in_cauldron)
+    .add_observer(on_drop_timeout);
 }
 
 #[derive(Component, Clone, FromTemplate, Reflect)]
@@ -34,7 +41,7 @@ pub fn cauldron_plugin(app: &mut App) {
 pub struct Cauldron(Laba);
 
 #[derive(Component, Clone, FromTemplate, Reflect)]
-pub struct CauldronDrops(Vec3);
+pub struct CauldronDrop(Vec3);
 
 #[derive(Component, Clone, FromTemplate, Reflect)]
 #[require(CollisionLayers::new(GameLayer::Trigger, GameLayer::Pickups))]
@@ -45,6 +52,14 @@ pub struct CauldronAssets {
     #[asset(path = "cauldron.glb#Scene0")]
     cauldron: Handle<WorldAsset>,
 }
+
+#[derive(AssetCollection, Resource)]
+pub struct BubbleMesh {
+    bubble: Handle<Mesh>,
+}
+
+#[derive(Component, Clone, FromTemplate, Reflect)]
+pub struct Bubble;
 
 /// the offset in the color space that a certain item produces
 #[derive(Debug, Component, Clone, FromTemplate, Reflect)]
@@ -94,7 +109,7 @@ fn spawn_cauldron(
 fn sync_material(
     cauldrons: Query<(&Cauldron, &Children)>,
     potion_planes: Query<&MeshMaterial3d<PotionMaterial>>,
-    drops: Query<&CauldronDrops>,
+    drops: Query<&CauldronDrop>,
     mut materials: ResMut<Assets<PotionMaterial>>,
 ) {
     for (cauldron, children) in cauldrons {
@@ -112,7 +127,7 @@ fn sync_material(
                 .smooth_nudge(&color.to_vec4(), 10f32.ln(), 0.01);
 
             let mut max = 0;
-            for (i, &CauldronDrops(offset)) in children
+            for (i, &CauldronDrop(offset)) in children
                 .into_iter()
                 .copied()
                 .filter_map(|child| drops.get(child).ok())
@@ -211,7 +226,7 @@ fn consume_items(
         let timer = commands
             .spawn((
                 TriggerTimer::new(2.),
-                CauldronDrops(
+                CauldronDrop(
                     (cauldron_transform.translation - pickup.0.translation())
                         .xz()
                         .extend(1.),
@@ -227,8 +242,45 @@ fn consume_items(
     }
 }
 
-fn on_drop_timeout(event: On<TimerTimeout>, mut commands: Commands) {
+fn on_drop_timeout(
+    event: On<TimerTimeout>,
+    mut commands: Commands,
+    drops: Query<(&ChildOf, &CauldronDrop)>,
+    cauldrons: Query<(&Transform, &Cauldron)>,
+    bubble: Res<BubbleMesh>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    if let Ok((parent, drop)) = drops.get(event.event().0)
+        && let Ok((transform, cauldron)) = cauldrons.get(parent.parent())
+    {
+        commands.spawn((
+            Transform::from_translation(transform.translation + drop.0)
+                .with_scale(Vec3::splat(0.005)),
+            Mesh3d(bubble.bubble.clone()),
+            MeshMaterial3d({
+                materials.add(StandardMaterial {
+                    base_color: cauldron.0.into(),
+                    ..default()
+                })
+            }),
+            Bubble,
+            TriggerTimer::new(3.),
+            LinearVelocity(Vec3::ZERO),
+        ));
+    }
+
     commands.entity(event.event().0).despawn();
+}
+
+fn move_bubble(mut bubbles: Query<(&mut Transform, &mut LinearVelocity), With<Bubble>>) {
+    const WIND: Vec3 = Vec3::new(0.001, 0., 0.002);
+    const LIFT: Vec3 = Vec3::new(0.0, 0.005, 0.0);
+
+    for (mut transform, mut velocity) in &mut bubbles {
+        velocity.0 += WIND + LIFT;
+        transform.translation += velocity.0.min(Vec3::splat(0.01));
+        transform.scale = (transform.scale - 0.00001).max(Vec3::splat(0.0001));
+    }
 }
 
 #[derive(Debug, Asset, Default, TypePath, AsBindGroup, Clone)]
