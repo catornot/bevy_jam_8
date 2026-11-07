@@ -104,14 +104,6 @@ pub fn spawn_player(
                         Binding (GamepadButton::South)
                     ]
                     --
-                    Action::<Crouch>::new()
-                    ~Hold::new(0.0)
-                    Bindings [
-                        Binding(KeyCode::ControlLeft)
-                        --
-                        Binding(GamepadButton::East)
-                    ]
-                    --
                     Action::<RotateCamera>::new()
                     ~Scale::splat(0.04)
                     DeadZone::default()
