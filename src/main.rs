@@ -18,6 +18,7 @@ mod pickups;
 mod player;
 mod prelude;
 mod rand;
+mod timer;
 mod wood_grain;
 
 #[allow(unused)]
@@ -64,6 +65,7 @@ fn main() {
             fox::fox_plugin,
             interactable::interactable_plugin,
             wood_grain::wood_grain_plugin,
+            timer::timer_plugin,
         ))
         .add_loading_state(
             LoadingState::new(GlobalStates::AssetLoading)

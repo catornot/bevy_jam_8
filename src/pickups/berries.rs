@@ -1,7 +1,7 @@
 use avian3d::prelude::*;
 use bevy::prelude::*;
 
-use crate::{pickups::Pickup, prelude::*};
+use crate::{cauldron::CauldronEffect, pickups::Pickup, prelude::*};
 
 #[derive(Resource)]
 pub struct BerryAssets {
@@ -50,5 +50,6 @@ pub fn berry_scene(BerryAssets { mesh, material }: &BerryAssets) -> impl Scene {
         Mesh3d(mesh)
         MeshMaterial3d<StandardMaterial>(material)
         Collider::cone(0.1, 0.2)
+        CauldronEffect(Vec3::new(0., 0.3, 0.1))
     }
 }

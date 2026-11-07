@@ -12,26 +12,43 @@ use crate::{
     interactable::{Interactable, Selected, UseAction},
     pickups::Pickup,
     prelude::*,
+    timer::{TimerTimeout, TriggerTimer},
 };
 
 const SHADER_ASSET_PATH: &str = "shaders/potion_shader.wesl";
 
 pub fn cauldron_plugin(app: &mut App) {
-    app.add_plugins(MaterialPlugin::<PotionMaterial>::default())
+    app.register_type::<Cauldron>()
+        .register_type::<CauldronDrops>()
+        .register_type::<CauldronTrigger>()
+        .register_type::<CauldronEffect>()
+        .add_plugins(MaterialPlugin::<PotionMaterial>::default())
         .add_systems(OnEnter(GlobalStates::Game), spawn_cauldron)
-        .add_systems(Update, (sync_color, drop_items))
-        .add_observer(deposit_in_cauldron);
+        .add_systems(Update, (sync_material, drop_items, consume_items))
+        .add_observer(deposit_in_cauldron)
+        .add_observer(on_drop_timeout);
 }
 
-#[derive(Component, Clone, FromTemplate)]
+#[derive(Component, Clone, FromTemplate, Reflect)]
 #[require(CollisionLayers::new(GameLayer::Cauldron, LayerMask::ALL))]
-pub struct Cauldron(Color);
+pub struct Cauldron(Hsva);
+
+#[derive(Component, Clone, FromTemplate, Reflect)]
+pub struct CauldronDrops(Vec3);
+
+#[derive(Component, Clone, FromTemplate, Reflect)]
+#[require(CollisionLayers::new(GameLayer::Trigger, GameLayer::Pickups))]
+pub struct CauldronTrigger;
 
 #[derive(AssetCollection, Resource)]
 pub struct CauldronAssets {
     #[asset(path = "cauldron.glb#Scene0")]
     cauldron: Handle<WorldAsset>,
 }
+
+/// the offset in the color space that a certain item produces
+#[derive(Debug, Component, Clone, FromTemplate, Reflect)]
+pub struct CauldronEffect(pub Vec3);
 
 fn spawn_cauldron(
     mut commands: Commands,
@@ -41,11 +58,12 @@ fn spawn_cauldron(
 ) {
     let material = PotionMaterial {
         color: Vec4::new(0.86644, -0.233887, 0.179498, 0.),
-        positions: [Vec2::new(0., 0.5).extend(1.); 8],
+        positions: [Vec2::new(-1., -1.).extend(-1.); 8],
     };
+    let color: Hsva = Color::srgba_u8(0, 255, 0, 255).into();
     commands.spawn_scene(bsn! {
         #Cauldron
-        Cauldron(Color::srgba_u8(0,255,0,255))
+        Cauldron(color)
         WorldAssetRoot({cauldron_assets.cauldron.clone()})
         Transform::from_xyz(0., 1.5, 10.)
         BoundingPolyhedronMarker::new(0.9)
@@ -58,6 +76,13 @@ fn spawn_cauldron(
             BoundingPolyhedronSkipMarker
             Mesh3d({meshes.add(Circle::new(0.9))})
             MeshMaterial3d<PotionMaterial>({materials.add(material)})
+            --
+            #Trigger
+            CauldronTrigger
+            Sensor
+            RigidBody::Static
+            Collider::cylinder(0.8, 0.5)
+            CollisionEventsEnabled
         ]
         Backpack
         BackpackConstraints {
@@ -66,14 +91,42 @@ fn spawn_cauldron(
     });
 }
 
-fn sync_color(
-    cauldrons: Query<(&Cauldron, &MeshMaterial3d<PotionMaterial>)>,
+fn sync_material(
+    cauldrons: Query<(&Cauldron, &Children)>,
+    potion_planes: Query<&MeshMaterial3d<PotionMaterial>>,
+    drops: Query<&CauldronDrops>,
     mut materials: ResMut<Assets<PotionMaterial>>,
 ) {
-    for (cauldron, material_handle) in cauldrons {
+    for (cauldron, children) in cauldrons {
+        let Some(material_handle) = children
+            .iter()
+            .find_map(|child| potion_planes.get(child).ok())
+        else {
+            continue;
+        };
+
         if let Some(mut material) = materials.get_mut(material_handle.id()) {
             let color: Oklaba = cauldron.0.into();
             material.color = color.to_vec4();
+
+            let mut max = 0;
+            for (i, &CauldronDrops(offset)) in children
+                .into_iter()
+                .copied()
+                .filter_map(|child| drops.get(child).ok())
+                .take(8)
+                .enumerate()
+            {
+                if let Some(slot) = material.positions.get_mut(i) {
+                    *slot = (offset + Vec2::splat(0.5).extend(0.)) / Vec2::splat(0.9).extend(1.);
+                    log::info!("{offset:?} => {:?}", *slot);
+                }
+                max = i + 1;
+            }
+
+            for index in max.min(8)..8 {
+                material.positions[index] = Vec3::splat(-1.);
+            }
         }
     }
 }
@@ -132,7 +185,51 @@ fn drop_items(
     }
 }
 
-#[derive(Asset, Default, TypePath, AsBindGroup, Debug, Clone)]
+fn consume_items(
+    mut commands: Commands,
+    mut collision_reader: MessageReader<CollisionStart>,
+    pickups: Query<(&GlobalTransform, &CauldronEffect), (With<Pickup>, Without<Backpacked>)>,
+    sensors: Query<&ChildOf, With<Sensor>>,
+    mut cauldrons: Query<(&mut Cauldron, &Transform), Without<CauldronEffect>>,
+) {
+    for collision_event in collision_reader.read() {
+        let Ok(sensor) = sensors.get(collision_event.collider2) else {
+            continue;
+        };
+
+        let Ok(pickup) = pickups.get(collision_event.collider1) else {
+            continue;
+        };
+
+        let Ok((mut cauldron, cauldron_transform)) = cauldrons.get_mut(sensor.parent()) else {
+            continue;
+        };
+
+        commands.entity(collision_event.collider1).despawn();
+
+        let timer = commands
+            .spawn((
+                TriggerTimer::new(2.),
+                CauldronDrops(
+                    (cauldron_transform.translation - pickup.0.translation())
+                        .xz()
+                        .extend(1.),
+                ),
+            ))
+            .id();
+        commands.entity(sensor.parent()).add_child(timer);
+
+        // cauldron.0.saturation = (cauldron.0.saturation + pickup.1.0.x).rem_euclid(1.);
+        // cauldron.0.hue = (cauldron.0.hue + pickup.1.0.y).rem_euclid(1.);
+        // cauldron.0.value = (cauldron.0.value + pickup.1.0.z).rem_euclid(1.);
+    }
+}
+
+fn on_drop_timeout(event: On<TimerTimeout>, mut commands: Commands) {
+    // commands.entity(event.event().0).despawn();
+}
+
+#[derive(Debug, Asset, Default, TypePath, AsBindGroup, Clone)]
 struct PotionMaterial {
     #[uniform(1)]
     color: Vec4,
