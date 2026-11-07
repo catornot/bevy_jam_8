@@ -11,10 +11,13 @@ GLB_FILES := $(BLEND_FILES:.blend=.glb)
 .PHONY: all run assets clean
 
 # Default target: updates assets, then runs your Rust application
-all: run
+all: build
+
+build: assets
+	cargo build
 
 # Run target depends on the assets being up-to-date
-run: assets
+run: build
 	cargo run
 
 # Target that triggers the pattern rule for all discovered .glb files
