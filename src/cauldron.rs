@@ -166,9 +166,13 @@ fn deposit_in_cauldron(
 
     for (mut transform, ent, backpacked) in &mut picked_up {
         if backpacked.get() == trigger.context {
-            commands.entity(cauldron).add_one_related::<Backpacked>(ent);
-            commands.entity(ent).insert(MovingToBackpack);
-            commands.entity(ent).remove::<ChildOf>();
+            if let Ok(mut cmds) = commands.get_entity(cauldron) {
+                cmds.add_one_related::<Backpacked>(ent);
+            }
+            if let Ok(mut cmds) = commands.get_entity(ent) {
+                cmds.insert(MovingToBackpack);
+                cmds.remove::<ChildOf>();
+            }
 
             if let Ok(parent_transform) = parents.get(backpacked.get()) {
                 transform.translation = parent_transform.transform_point(transform.translation);

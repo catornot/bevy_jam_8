@@ -69,6 +69,7 @@ pub fn spawn_player(
     mut commands: Commands,
     mut assets: ResMut<AssetServer>,
     player_assets: Res<PlayerAssets>,
+    camera: Query<Entity, With<Camera3d>>,
 ) {
     // spawn player
     let player = commands
@@ -135,16 +136,23 @@ pub fn spawn_player(
         .id();
 
     // spawn camera
-    let camera = commands
-        .spawn((
-            CameraDistance(0.),
-            RayCaster::default().with_direction(Dir3::NEG_Z),
-            Camera3d::default(),
-            InteractableRayCaster,
-            // Enable the optional builtin camera controller
-            CharacterControllerCameraOf::new(player),
-        ))
-        .id();
+    let camera = match camera
+        .single()
+        .ok()
+        .and_then(|camera| commands.get_entity(camera).ok())
+    {
+        Some(camera) => camera,
+        None => commands.spawn_empty(),
+    }
+    .insert((
+        CameraDistance(0.),
+        RayCaster::default().with_direction(Dir3::NEG_Z),
+        Camera3d::default(),
+        InteractableRayCaster,
+        // Enable the optional builtin camera controller
+        CharacterControllerCameraOf::new(player),
+    ))
+    .id();
 
     // spawn audio listener
     let listener = SpatialListener::new(0.2);

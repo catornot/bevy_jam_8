@@ -11,6 +11,7 @@ bevy_ahoy = { git = "https://github.com/catornot/bevy_ahoy.git", branch = "0.20"
 bevy_asset_loader = "0.28.1"
 bevy_enhanced_input = "0.27.2"
 bevy_mod_outline = { version = "0.14.0", default-features = false, features = ["interpolation", "flood", "reflect"] }
+bevy_seedling = { git = "https://github.com/eswartz/bevy_seedling-fork.git", branch = "bevy-0.20", default-features = false, features = ["ogg", "hrtf", "reflect", "symphonia", "loudness", "cpal", "effects"] }
 rand = "0.10.3"
 
 [profile.dev]
@@ -18,7 +19,14 @@ opt-level = 0
 
 [dependencies.bevy]
 version = "0.20.1"
-features = []
+features =  ["bevy_feathers"]
+
+[patch.crates-io]
+bevy_seedling = { git = "https://github.com/eswartz/bevy_seedling-fork.git", branch = "bevy-0.20" }
+firewheel = { git = "https://github.com/eswartz/Firewheel-fork.git", branch = "bevy-0.20" }
+firewheel-core = { git = "https://github.com/eswartz/Firewheel-fork.git", branch = "bevy-0.20" }
+firewheel-ircam-hrtf = { git = "https://github.com/eswartz/bevy_seedling-fork.git", branch = "bevy-0.20" }
+firewheel-web-audio = { git = "https://github.com/eswartz/bevy_seedling-fork.git", branch = "bevy-0.20" }
 
 # Enable high optimizations for dependencies (incl. Bevy), but not for our code:
 [profile.dev.package."*"]
