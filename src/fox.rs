@@ -49,7 +49,7 @@ pub mod hostile_state {
     }
 }
 
-pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
+pub fn spawn_fox(In(transform): In<Transform>, mut command: Commands, fox_assets: Res<FoxAssets>) {
     command.spawn_scene(bsn! {
             #Fox
             Fox
@@ -67,7 +67,7 @@ pub fn spawn_fox(mut command: Commands, fox_assets: Res<FoxAssets>) {
             ]
             LockedAxes::new().lock_rotation_x().lock_rotation_z() // only allow rotation around y axis
             LinearVelocity::ZERO
-            Transform::from_xyz(10.0, 100.0, 0.0)
+            transform
             hostile_state::Chasing
     });
 }

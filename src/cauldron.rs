@@ -27,7 +27,6 @@ pub fn cauldron_plugin(app: &mut App) {
     .register_type::<CauldronEffect>()
     .register_type::<Bubble>()
     .add_plugins(MaterialPlugin::<PotionMaterial>::default())
-    .add_systems(OnEnter(GlobalStates::Game), spawn_cauldron)
     .add_systems(
         Update,
         (sync_material, drop_items, consume_items, move_bubble),
@@ -65,7 +64,8 @@ pub struct Bubble;
 #[derive(Debug, Component, Clone, FromTemplate, Reflect)]
 pub struct CauldronEffect(pub Vec3);
 
-fn spawn_cauldron(
+pub fn spawn_cauldron(
+    In(transform): In<Transform>,
     mut commands: Commands,
     cauldron_assets: Res<CauldronAssets>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -80,7 +80,7 @@ fn spawn_cauldron(
         #Cauldron
         Cauldron(color)
         WorldAssetRoot({cauldron_assets.cauldron.clone()})
-        Transform::from_xyz(0., 1.5, 10.)
+        transform.with_translation(transform.translation.with_y(transform.translation.y + 0.5))
         BoundingPolyhedronMarker::new(0.9)
         RigidBody::Static
         Collider::cylinder(1., 1.)
@@ -288,7 +288,7 @@ fn move_bubble(mut bubbles: Query<(&mut Transform, &mut LinearVelocity), With<Bu
 }
 
 #[derive(Debug, Asset, Default, TypePath, AsBindGroup, Clone)]
-struct PotionMaterial {
+pub struct PotionMaterial {
     #[uniform(1)]
     color: Vec4,
 

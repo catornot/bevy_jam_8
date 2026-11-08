@@ -17,12 +17,14 @@ mod default_scene;
 mod fox;
 mod interactable;
 mod leditor;
+mod lloader;
 mod main_menu;
 mod pickups;
 mod player;
 mod prelude;
 mod rand;
 mod timer;
+mod tree;
 mod wood_grain;
 
 #[allow(unused)]
@@ -76,17 +78,20 @@ fn main() {
             timer::timer_plugin,
             leditor::leditor_plugin,
             main_menu::main_menu_plugin,
+            lloader::lloader_plugin,
         ))
+        .add_plugins((tree::tree_plugin,))
         .add_loading_state(
             LoadingState::new(GlobalStates::AssetLoading)
                 .continue_to_state(GlobalStates::MainMenu)
                 .load_collection::<player::PlayerAssets>()
                 .load_collection::<default_scene::Cubemap>()
-                .load_collection::<default_scene::SceneAssets>()
                 .load_collection::<pickups::berries::BerryAssets>()
                 .load_collection::<fox::FoxAssets>()
                 .load_collection::<cauldron::CauldronAssets>()
-                .load_collection::<main_menu::MainMenuAssets>(),
+                .load_collection::<main_menu::MainMenuAssets>()
+                .load_collection::<lloader::LevelAssets>()
+                .load_collection::<tree::TreeAssets>(),
         )
         .add_systems(OnEnter(GlobalStates::MainMenu), spawn_camera)
         .init_state::<GlobalStates>()
@@ -94,5 +99,8 @@ fn main() {
 }
 
 fn spawn_camera(mut commands: Commands) {
-    commands.spawn(Camera3d::default());
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_xyz(0., 500., 0.).looking_at(Vec3::ZERO, Dir3::Y),
+    ));
 }

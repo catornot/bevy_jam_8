@@ -1,4 +1,4 @@
-use avian3d::parry::shape::ConvexPolyhedron;
+use avian3d::{parry::shape::ConvexPolyhedron, prelude::*};
 use bevy::{mesh::VertexAttributeValues, prelude::*};
 
 pub fn bounding_polyhedron_plugin(app: &mut App) {
@@ -22,23 +22,26 @@ impl BoundingPolyhedron {
 
 /// the f32 is the scale
 #[derive(Component, Clone, Reflect)]
-pub struct BoundingPolyhedronMarker(f32, bool);
+pub struct BoundingPolyhedronMarker(f32, bool, bool);
 
 #[derive(Component, Default, Clone, Reflect)]
 pub struct BoundingPolyhedronSkipMarker;
 
 impl Default for BoundingPolyhedronMarker {
     fn default() -> Self {
-        Self(1., false)
+        Self(1., false, false)
     }
 }
 
 impl BoundingPolyhedronMarker {
     pub fn new(scale: f32) -> Self {
-        Self(scale.max(0.), false)
+        Self(scale.max(0.), false, false)
     }
     pub fn swizzle(self) -> Self {
-        Self(self.0, true)
+        Self(self.0, true, self.2)
+    }
+    pub fn with_collier(self) -> Self {
+        Self(self.0, self.1, true)
     }
 }
 
@@ -49,7 +52,7 @@ fn calculate_bounding_polyhedron(
     meshes: Query<&Mesh3d, Without<BoundingPolyhedronSkipMarker>>,
     assets: Res<Assets<Mesh>>,
 ) {
-    for (root, &BoundingPolyhedronMarker(scale, swizzle)) in roots {
+    for (root, &BoundingPolyhedronMarker(scale, swizzle, as_collider)) in roots {
         let mut queue = vec![root];
         let mut vertices = Vec::new();
 
@@ -91,7 +94,13 @@ fn calculate_bounding_polyhedron(
             else {
                 continue;
             };
-            root_cmds.insert(BoundingPolyhedron(convex_polyhedron));
+
+            if as_collider {
+                let verts = convex_polyhedron.points();
+                root_cmds.insert(Collider::convex_hull(verts).expect("this already succeeded"));
+            } else {
+                root_cmds.insert(BoundingPolyhedron(convex_polyhedron));
+            }
         }
     }
 }

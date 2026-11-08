@@ -49,7 +49,14 @@ struct PlayerInput;
 pub fn player_plugin(app: &mut App) {
     app.add_input_context::<PlayerInput>()
         .register_type::<Player>()
-        .add_systems(OnEnter(GlobalStates::Game), (spawn_player, capture_cursor))
+        .add_systems(
+            OnEnter(GlobalStates::Game),
+            (attach_camera_to_player, capture_cursor),
+        )
+        .add_systems(
+            OnExit(GlobalStates::Game),
+            (remove_camera_components, release_cursor),
+        )
         .add_systems(
             Update,
             (
@@ -66,76 +73,84 @@ pub fn player_plugin(app: &mut App) {
 }
 
 pub fn spawn_player(
+    In(transform): In<Transform>,
     mut commands: Commands,
-    mut assets: ResMut<AssetServer>,
     player_assets: Res<PlayerAssets>,
-    camera: Query<Entity, With<Camera3d>>,
 ) {
     // spawn player
-    let player = commands
-        .spawn_scene(bsn! {
-                # Player
-                Player
-                CharacterController {
-                    crouch_height: 0.5,
-                    mantle_height: 0.5,
-                    climb_pull_up_height: 0.5,
-                    standing_view_height: 0.5,
-                }
-                BoundingPolyhedronMarker::new(0.2).swizzle()
-                WorldAssetRoot({player_assets.player_scene.clone()})
-                RigidBody::Kinematic
-                Collider::cylinder(0.2, 0.5)
-                Transform::from_xyz(0.0, 100.0, 0.0).with_scale(Vec3::splat(1.))
-                PlayerInput
-                Actions<PlayerInput> [
-                    Action::<Movement>::new()
-                    DeadZone::default()
-                    Bindings [
-                        {cardinal::wasd_keys()}
-                        --
-                        {axial::left_stick()}
-                    ]
+    commands.spawn_scene(bsn! {
+            # Player
+            Player
+            CharacterController {
+                crouch_height: 0.5,
+                mantle_height: 0.5,
+                climb_pull_up_height: 0.5,
+                standing_view_height: 0.5,
+            }
+            BoundingPolyhedronMarker::new(0.2).swizzle()
+            WorldAssetRoot({player_assets.player_scene.clone()})
+            RigidBody::Kinematic
+            Collider::cylinder(0.2, 0.5)
+            transform.with_scale(Vec3::splat(1.))
+            PlayerInput
+            Actions<PlayerInput> [
+                Action::<Movement>::new()
+                DeadZone::default()
+                Bindings [
+                    {cardinal::wasd_keys()}
                     --
-                    Action::<Jump>::new()
-                    Press::default()
-                    Bindings [
-                        Binding (KeyCode::Space)
-                        --
-                        Binding (GamepadButton::South)
-                    ]
-                    --
-                    Action::<RotateCamera>::new()
-                    ~Scale::splat(0.04)
-                    DeadZone::default()
-                    Bindings [
-                        Binding::mouse_motion()
-                        --
-                        {axial::right_stick()}
-                    ]
-                    --
-                    Action::<CameraZoom>::new()
-                    Bindings [
-                        Binding::mouse_wheel()
-                        ~SwizzleAxis::YXZ
-                        --
-                        {cardinal::dpad()}
-                    ]
-                    --
-                    Action::<UseAction>::new()
-                    ~Hold::new(0.0)
-                    Bindings [
-                        Binding(MouseButton::Left)
-                        --
-                        Binding(GamepadButton::LeftTrigger)
-                    ]
+                    {axial::left_stick()}
                 ]
-                PointLight
-                Backpack
-        })
-        .id();
+                --
+                Action::<Jump>::new()
+                Press::default()
+                Bindings [
+                    Binding (KeyCode::Space)
+                    --
+                    Binding (GamepadButton::South)
+                ]
+                --
+                Action::<RotateCamera>::new()
+                ~Scale::splat(0.04)
+                DeadZone::default()
+                Bindings [
+                    Binding::mouse_motion()
+                    --
+                    {axial::right_stick()}
+                ]
+                --
+                Action::<CameraZoom>::new()
+                Bindings [
+                    Binding::mouse_wheel()
+                    ~SwizzleAxis::YXZ
+                    --
+                    {cardinal::dpad()}
+                ]
+                --
+                Action::<UseAction>::new()
+                ~Hold::new(0.0)
+                Bindings [
+                    Binding(MouseButton::Left)
+                    --
+                    Binding(GamepadButton::LeftTrigger)
+                ]
+            ]
+            PointLight
+            Backpack
+    });
+}
 
-    // spawn camera
+fn attach_camera_to_player(
+    camera: Query<Entity, With<Camera3d>>,
+    player: Query<Entity, With<Player>>,
+    mut commands: Commands,
+    mut assets: ResMut<AssetServer>,
+) {
+    let Ok(player) = player.single() else {
+        log::error!("failed to locate player for camera attach");
+        return;
+    };
+
     let camera = match camera
         .single()
         .ok()
@@ -154,22 +169,19 @@ pub fn spawn_player(
     ))
     .id();
 
-    // spawn audio listener
-    let listener = SpatialListener::new(0.2);
-    commands.spawn((
-        Transform::default(),
-        Visibility::default(),
-        listener.clone(),
-        children![
-            // left ear indicator
-            (Transform::from_translation(listener.left_ear_offset),),
-            // right ear indicator
-            (Transform::from_translation(listener.right_ear_offset),)
-        ],
-        ChildOf(camera),
-    ));
-
     commands.spawn_scene(cursor_scene(camera, assets.as_mut()));
+}
+
+fn remove_camera_components(camera: Query<Entity, With<Camera3d>>, mut commands: Commands) {
+    let Ok(camera) = camera.single() else {
+        return;
+    };
+
+    commands
+        .entity(camera)
+        .remove::<RayCaster>()
+        .remove::<InteractableRayCaster>()
+        .remove::<CharacterControllerCameraOf>();
 }
 
 fn cursor_scene(target_camera: Entity, assets: &mut AssetServer) -> impl Scene {
