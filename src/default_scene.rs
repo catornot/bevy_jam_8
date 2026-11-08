@@ -26,9 +26,8 @@ fn scene(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     scene_assets: Res<SceneAssets>,
-    mut materials: ResMut<Assets<WoodGrainMaterial>>,
 ) {
-    commands.spawn_scene_list(other_scene(scene_assets, &mut materials));
+    commands.spawn_scene_list(other_scene(scene_assets));
     commands.spawn_scene_list(ground_scene(100., &asset_server));
 }
 
@@ -126,9 +125,7 @@ fn edit_tree_material(
 
 fn other_scene(
     scene_assets: Res<SceneAssets>,
-    materials: &mut ResMut<Assets<WoodGrainMaterial>>,
 ) -> impl SceneList {
-    let material = WoodGrainMaterial::default();
     bsn_list! {
         #Cube
         Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
@@ -146,7 +143,6 @@ fn other_scene(
         #Tree
         Tree
         WorldAssetRoot({scene_assets.tree_scene.clone()})
-        MeshMaterial3d<WoodGrainMaterial>({materials.add(material)})
     }
 }
 
