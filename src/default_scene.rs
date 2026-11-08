@@ -5,6 +5,7 @@ use bevy::{
     pbr::ScreenSpaceAmbientOcclusion,
     prelude::*,
     render::render_resource::{TextureViewDescriptor, TextureViewDimension},
+    world_serialization::WorldInstanceReady,
 };
 
 use crate::{fox, prelude::*, wood_grain::WoodGrainMaterial};
@@ -15,18 +16,12 @@ pub fn default_scene_plugin(app: &mut App) {
         brightness: 1.0,
         ..default()
     })
-    .add_systems(
-        OnEnter(GlobalStates::Game),
-        (scene, edit_tree_material, fox::spawn_fox).chain(),
-    )
-    .add_observer(add_skybox_to_camera);
+    .add_systems(OnEnter(GlobalStates::Game), (scene, fox::spawn_fox).chain())
+    .add_observer(add_skybox_to_camera)
+    .add_observer(replace_tree_materials);
 }
 
-fn scene(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    scene_assets: Res<SceneAssets>,
-) {
+fn scene(mut commands: Commands, asset_server: Res<AssetServer>, scene_assets: Res<SceneAssets>) {
     commands.spawn_scene_list(other_scene(scene_assets));
     commands.spawn_scene_list(ground_scene(100., &asset_server));
 }
@@ -92,40 +87,35 @@ pub struct SceneAssets {
     tree_scene: Handle<WorldAsset>,
 }
 
-fn edit_tree_material_helper(
-    commands: &mut Commands,
-    entity: Entity,
-    children: Query<&Children>,
-    mesh_material: &MeshMaterial3d<
-        bevy::pbr::ExtendedMaterial<StandardMaterial, crate::wood_grain::WoodGrainExtension>,
-    >,
-) {
-    for descendant in children.iter_descendants(entity) {
-        commands
-            .entity(descendant)
-            .remove::<MeshMaterial3d<StandardMaterial>>()
-            .insert(mesh_material.clone());
-        edit_tree_material_helper(commands, descendant, children, mesh_material);
-    }
-}
-
-fn edit_tree_material(
+fn replace_tree_materials(
+    ready: On<WorldInstanceReady>,
     mut commands: Commands,
-    entities: Query<Entity, With<Tree>>,
+    trees: Query<(), With<Tree>>,
     children: Query<&Children>,
+    mesh_materials: Query<&MeshMaterial3d<StandardMaterial>>,
     mut wood_grain_material_assets: ResMut<Assets<WoodGrainMaterial>>,
 ) {
-    let material = WoodGrainMaterial::default();
+    let root = ready.entity;
+
+    // Only act on scenes whose root is a Tree.
+    if !trees.contains(root) {
+        return;
+    }
+
     let mesh_material =
-        MeshMaterial3d::<WoodGrainMaterial>(wood_grain_material_assets.add(material));
-    for entity in entities {
-        edit_tree_material_helper(&mut commands, entity, children, &mesh_material);
+        MeshMaterial3d(wood_grain_material_assets.add(WoodGrainMaterial::default()));
+
+    for e in children.iter_descendants(root) {
+        if mesh_materials.contains(e) {
+            commands
+                .entity(e)
+                .remove::<MeshMaterial3d<StandardMaterial>>()
+                .insert(mesh_material.clone());
+        }
     }
 }
 
-fn other_scene(
-    scene_assets: Res<SceneAssets>,
-) -> impl SceneList {
+fn other_scene(scene_assets: Res<SceneAssets>) -> impl SceneList {
     bsn_list! {
         #Cube
         Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
