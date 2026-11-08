@@ -74,6 +74,7 @@ fn main() {
                 .continue_to_state(GlobalStates::Game)
                 .load_collection::<player::PlayerAssets>()
                 .load_collection::<default_scene::Cubemap>()
+                .load_collection::<default_scene::SceneAssets>()
                 .load_collection::<pickups::berries::BerryAssets>()
                 .load_collection::<fox::FoxAssets>()
                 .load_collection::<cauldron::CauldronAssets>(),
